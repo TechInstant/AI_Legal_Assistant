@@ -13,6 +13,7 @@ import {
   Home,
   LogIn,
   UserPlus,
+  Bookmark,
   User as UserIcon,
 } from 'lucide-react';
 import { Button } from './Button';
@@ -29,10 +30,13 @@ export const Layout: React.FC = () => {
   const [accountOpen, setAccountOpen] = useState(false);
 
   const navItems = [
-    { name: 'Home', path: '/', icon: Home, exact: true },
-    { name: 'Explorer', path: '/explorer', icon: BookOpen, exact: false },
-    { name: 'Assistant', path: '/assistant', icon: MessageSquare, exact: false },
+    { name: 'Home', path: '/', icon: Home, exact: true, authOnly: false },
+    { name: 'Explorer', path: '/explorer', icon: BookOpen, exact: false, authOnly: false },
+    { name: 'Assistant', path: '/assistant', icon: MessageSquare, exact: false, authOnly: false },
+    { name: 'Bookmarks', path: '/bookmarks', icon: Bookmark, exact: false, authOnly: true },
   ];
+
+  const visibleNavItems = navItems.filter((i) => !i.authOnly || !!user);
 
   // Lock body scroll while the side drawer is open.
   useEffect(() => {
@@ -103,8 +107,8 @@ export const Layout: React.FC = () => {
             </Link>
 
             {/* Desktop Navigation */}
-            <nav className="hidden md:flex items-center gap-8">
-              {navItems.filter((i) => i.path !== '/').map((item) => {
+            <nav className="hidden md:flex items-center gap-6 lg:gap-8">
+              {visibleNavItems.filter((i) => i.path !== '/').map((item) => {
                 const isActive = item.exact
                   ? location.pathname === item.path
                   : location.pathname.startsWith(item.path);
@@ -152,16 +156,23 @@ export const Layout: React.FC = () => {
                     </span>
                   </button>
                   {accountOpen && (
-                    <div className="absolute right-0 mt-2 w-56 rounded-xl border border-brand-slate/30 bg-white dark:bg-brand-carbon shadow-xl py-2">
-                      <div className="px-4 py-2 text-xs text-brand-slate dark:text-brand-mist border-b border-brand-slate/20">
+                    <div className="absolute right-0 mt-2 w-60 rounded-xl border border-slate/20 dark:border-ink-700 bg-paper-soft dark:bg-ink-800 shadow-xl py-2">
+                      <div className="px-4 py-2 text-xs text-slate dark:text-mist border-b border-slate/15 dark:border-ink-700">
                         Signed in as
-                        <div className="truncate font-medium text-world-deep-ocean dark:text-world-sand">
+                        <div className="truncate font-medium text-ink-100 dark:text-paper">
                           {user.email}
                         </div>
                       </div>
+                      <Link
+                        to="/bookmarks"
+                        onClick={() => setAccountOpen(false)}
+                        className="w-full flex items-center gap-2 px-4 py-2 text-sm text-ink-100 dark:text-paper hover:bg-iris-500/5 hover:text-iris-500 transition-colors"
+                      >
+                        <Bookmark className="w-4 h-4" /> Bookmarks
+                      </Link>
                       <button
                         onClick={handleSignOut}
-                        className="w-full flex items-center gap-2 px-4 py-2 text-sm text-brand-slate dark:text-brand-mist hover:bg-region-americas/10 hover:text-region-americas transition-colors"
+                        className="w-full flex items-center gap-2 px-4 py-2 text-sm text-slate dark:text-mist hover:bg-rose-500/10 hover:text-rose-500 transition-colors"
                       >
                         <LogOut className="w-4 h-4" /> Sign out
                       </button>
@@ -284,7 +295,7 @@ export const Layout: React.FC = () => {
 
               {/* Nav items */}
               <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
-                {navItems.map((item) => {
+                {visibleNavItems.map((item) => {
                   const isActive = item.exact
                     ? location.pathname === item.path
                     : location.pathname.startsWith(item.path);

@@ -261,7 +261,7 @@ export const Assistant: React.FC = () => {
   return (
     <div className="flex-1 flex flex-col w-full max-w-4xl mx-auto px-3 sm:px-4 py-4 sm:py-6 md:py-8 min-h-0">
       {/* Header */}
-      <div className="mb-3 md:mb-5 flex items-start sm:items-end justify-between gap-2 sm:gap-3">
+      <div className="on-map mb-3 md:mb-5 flex items-start sm:items-end justify-between gap-2 sm:gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 mb-1">
             <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-iris-500 shrink-0" />

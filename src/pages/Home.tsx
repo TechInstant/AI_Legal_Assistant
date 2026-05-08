@@ -1,5 +1,14 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ArrowRight, Search, Globe, Shield, Sparkles, BookOpen } from 'lucide-react';
+import {
+  ArrowRight,
+  Search,
+  Globe,
+  Shield,
+  Sparkles,
+  BookOpen,
+  Bookmark,
+  Clock,
+} from 'lucide-react';
 import { Button } from '../components/Button';
 import { Card } from '../components/Card';
 import { Link, useNavigate } from 'react-router-dom';
@@ -7,13 +16,31 @@ import { fetchConstitutions, type Constitution } from '../services/api';
 import { regionLabel, regionColorClass, type Region } from '../data/constitutions';
 import { ContinentSelector } from '../components/ContinentSelector';
 import { CountryDropdown } from '../components/CountryDropdown';
+import { useAuth } from '../context/AuthContext';
+import { useBookmarks, useRecentlyViewed } from '../lib/useBookmarks';
 
 export const Home: React.FC = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const { items: bookmarks } = useBookmarks();
+  const { items: recent } = useRecentlyViewed();
   const [constitutions, setConstitutions] = useState<Constitution[]>([]);
   const [continent, setContinent] = useState<Region | 'all'>('all');
   const [countryId, setCountryId] = useState<string | null>(null);
   const [query, setQuery] = useState('');
+
+  const fullName = (user?.user_metadata?.full_name as string | undefined) ?? '';
+  const firstName = fullName.split(/\s+/)[0] || user?.email?.split('@')[0] || '';
+  const initials =
+    fullName
+      .split(/\s+/)
+      .map((s) => s[0])
+      .filter(Boolean)
+      .slice(0, 2)
+      .join('')
+      .toUpperCase() ||
+    user?.email?.[0]?.toUpperCase() ||
+    'U';
 
   useEffect(() => {
     fetchConstitutions().then(setConstitutions);
@@ -48,10 +75,18 @@ export const Home: React.FC = () => {
 
   const featured = constitutions.filter((c) => c.indexed).slice(0, 6);
 
+  const recentCountries = useMemo(() => {
+    const byId = new Map(constitutions.map((c) => [c.id, c]));
+    return recent
+      .map((r) => byId.get(r.constitution_id))
+      .filter((c): c is Constitution => !!c)
+      .slice(0, 5);
+  }, [recent, constitutions]);
+
   return (
     <div className="flex flex-col min-h-full">
       {/* ==== HERO ==== */}
-      <section className="relative px-4 py-14 sm:py-20 md:py-24 flex flex-col items-center text-center overflow-hidden">
+      <section className="on-map relative px-4 py-14 sm:py-20 md:py-24 flex flex-col items-center text-center overflow-hidden">
         {/* Soft warm/cool wash on top of the global world map */}
         <div aria-hidden="true" className="absolute inset-0 -z-10 opacity-60">
           <div className="absolute top-1/4 left-1/4 w-56 h-56 sm:w-72 sm:h-72 rounded-full bg-iris-500/15 blur-3xl" />
@@ -91,8 +126,61 @@ export const Home: React.FC = () => {
         </div>
       </section>
 
+      {/* ==== Welcome panel (only when logged in) ==== */}
+      {user && (
+        <section className="px-3 sm:px-4 -mt-6 sm:-mt-8 mb-6 sm:mb-8">
+          <Card className="max-w-4xl mx-auto p-5 sm:p-6 bg-paper-soft/95 dark:bg-ink-800/85">
+            <div className="flex items-center gap-4 flex-wrap">
+              <span className="w-12 h-12 rounded-full bg-gradient-to-br from-iris-500 to-sage-500 text-white flex items-center justify-center text-base font-semibold shrink-0">
+                {initials}
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="text-xs uppercase tracking-wider text-slate dark:text-mist mb-0.5">
+                  Welcome back
+                </p>
+                <h2 className="m-0 text-xl sm:text-2xl truncate">
+                  {firstName ? `Hello, ${firstName}` : 'Hello'}
+                </h2>
+              </div>
+              <Link to="/bookmarks" className="shrink-0">
+                <Button variant="secondary" className="px-4 py-2">
+                  <Bookmark className="w-4 h-4" />
+                  <span className="hidden sm:inline">Bookmarks</span>
+                  <span className="text-xs px-1.5 py-0.5 rounded-full bg-honey-500/15 text-honey-500 ml-1">
+                    {bookmarks.length}
+                  </span>
+                </Button>
+              </Link>
+            </div>
+
+            {recentCountries.length > 0 && (
+              <div className="mt-5 pt-5 border-t border-slate/10 dark:border-ink-700">
+                <div className="flex items-center gap-2 text-xs uppercase tracking-wider text-slate dark:text-mist mb-3">
+                  <Clock className="w-3.5 h-3.5" />
+                  Continue reading
+                </div>
+                <div className="flex gap-2 overflow-x-auto -mx-1 px-1 pb-1">
+                  {recentCountries.map((c) => (
+                    <Link
+                      key={c.id}
+                      to={`/explorer/${c.id}`}
+                      className="shrink-0 flex items-center gap-2 px-3 py-2 rounded-lg border border-slate/20 dark:border-ink-700 hover:border-iris-500 hover:bg-iris-500/5 transition-colors"
+                    >
+                      <span className="text-lg leading-none">{c.flag}</span>
+                      <span className="text-sm font-medium truncate max-w-[140px]">
+                        {c.country}
+                      </span>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            )}
+          </Card>
+        </section>
+      )}
+
       {/* ==== Continent + country picker ==== */}
-      <section className="px-3 sm:px-4 -mt-6 sm:-mt-8">
+      <section className={`px-3 sm:px-4 ${user ? '' : '-mt-6 sm:-mt-8'}`}>
         <Card className="max-w-4xl mx-auto p-4 sm:p-6 md:p-7 space-y-4 sm:space-y-5 bg-paper-soft/95 dark:bg-ink-800/80 backdrop-blur-md">
           <div className="flex items-center gap-2 text-[11px] sm:text-xs uppercase tracking-[0.18em] text-slate dark:text-mist">
             <Globe className="w-3.5 h-3.5 text-iris-500" />

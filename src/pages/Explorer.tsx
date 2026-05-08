@@ -18,6 +18,12 @@ import {
 import { regionLabel, regionColorClass, type Region } from '../data/constitutions';
 import { ContinentSelector } from '../components/ContinentSelector';
 import { CountryDropdown } from '../components/CountryDropdown';
+import {
+  subscribeCountriesStatus,
+  type CountriesStatus,
+} from '../services/countries';
+import { BookmarkButton } from '../components/BookmarkButton';
+import { useTrackVisit } from '../lib/useBookmarks';
 
 const ListenButton: React.FC<{ text: string }> = ({ text }) => {
   const [playing, setPlaying] = useState(false);
@@ -136,11 +142,25 @@ export const Explorer: React.FC = () => {
   const { constitutionId } = useParams<{ constitutionId?: string }>();
   const navigate = useNavigate();
 
+  // Track this country in the recently-viewed list (powers Home's "Continue
+  // reading" strip). No-op when constitutionId is undefined.
+  useTrackVisit(constitutionId);
+
   const [constitutions, setConstitutions] = useState<Constitution[]>([]);
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(true);
   const [continent, setContinent] = useState<Region | 'all'>('all');
   const [activeArticleId, setActiveArticleId] = useState<string | null>(null);
+  const [countryStatus, setCountryStatus] = useState<CountriesStatus>({
+    state: 'idle',
+  });
+
+  useEffect(() => {
+    const unsub = subscribeCountriesStatus(setCountryStatus);
+    return () => {
+      unsub();
+    };
+  }, []);
 
   // Load constitutions
   useEffect(() => {
@@ -197,16 +217,18 @@ export const Explorer: React.FC = () => {
   if (!constitutionId) {
     return (
       <div className="max-w-7xl mx-auto px-3 sm:px-4 py-8 sm:py-12">
-        <div className="flex items-center gap-2 sm:gap-3 mb-2 sm:mb-3">
-          <Globe className="w-6 h-6 sm:w-7 sm:h-7 text-iris-500" />
-          <h1 className="m-0 text-2xl sm:text-3xl md:text-4xl">
-            Constitutional Explorer
-          </h1>
+        <div className="on-map">
+          <div className="flex items-center gap-2 sm:gap-3 mb-2 sm:mb-3">
+            <Globe className="w-6 h-6 sm:w-7 sm:h-7 text-iris-500" />
+            <h1 className="m-0 text-2xl sm:text-3xl md:text-4xl">
+              Constitutional Explorer
+            </h1>
+          </div>
+          <p className="text-sm sm:text-base text-slate dark:text-mist mb-6 sm:mb-8 max-w-2xl">
+            Browse the supreme legal texts of nations around the world. Filter by
+            continent or jump straight to a country.
+          </p>
         </div>
-        <p className="text-sm sm:text-base text-slate dark:text-mist mb-6 sm:mb-8 max-w-2xl">
-          Browse the supreme legal texts of nations around the world. Filter by
-          continent or jump straight to a country.
-        </p>
 
         <Card className="p-4 sm:p-6 mb-8 sm:mb-10 space-y-4 sm:space-y-5 bg-paper-soft/95 dark:bg-ink-800/80">
           <ContinentSelector value={continent} onChange={setContinent} />
@@ -222,10 +244,33 @@ export const Explorer: React.FC = () => {
               }
             />
             <div className="text-xs sm:text-sm text-slate dark:text-mist text-left">
-              {filteredCountries.length} constitution
-              {filteredCountries.length === 1 ? '' : 's'}
+              {filteredCountries.length} countr
+              {filteredCountries.length === 1 ? 'y' : 'ies'}
+              <span className="ml-1 text-slate/70">
+                ({filteredCountries.filter((c) => c.indexed).length} indexed)
+              </span>
             </div>
           </div>
+
+          {/* REST Countries status indicator */}
+          {countryStatus.state === 'loading' && (
+            <p className="text-[11px] text-slate dark:text-mist flex items-center gap-2">
+              <Loader2 className="w-3 h-3 animate-spin" />
+              Loading the global country catalogue…
+            </p>
+          )}
+          {countryStatus.state === 'ok' && (
+            <p className="text-[11px] text-sage-500">
+              ● {countryStatus.count} countries loaded from REST Countries
+              {countryStatus.source === 'cache' ? ' (cached)' : ''}
+            </p>
+          )}
+          {countryStatus.state === 'error' && (
+            <p className="text-[11px] text-rose-500">
+              ● Couldn't reach REST Countries — showing only the indexed
+              countries. ({countryStatus.message})
+            </p>
+          )}
         </Card>
 
         {loading ? (
@@ -254,7 +299,7 @@ export const Explorer: React.FC = () => {
       </button>
 
       {activeConstitution && (
-        <div className="flex items-start gap-3 sm:gap-4 mb-6 sm:mb-8">
+        <div className="on-map flex items-start gap-3 sm:gap-4 mb-6 sm:mb-8">
           <div className="shrink-0">
             <CountryFlag c={activeConstitution} size="lg" />
           </div>
@@ -412,7 +457,13 @@ export const Explorer: React.FC = () => {
                       {a.article_number} — {a.title}
                     </h2>
                   </div>
-                  <ListenButton text={`${a.title}. ${a.content}`} />
+                  <div className="flex items-center gap-2 shrink-0">
+                    <BookmarkButton
+                      articleId={a.id}
+                      constitutionId={a.constitution_id}
+                    />
+                    <ListenButton text={`${a.title}. ${a.content}`} />
+                  </div>
                 </div>
 
                 <p className="text-sm sm:text-base md:text-lg leading-relaxed text-slate dark:text-mist whitespace-pre-line break-words">

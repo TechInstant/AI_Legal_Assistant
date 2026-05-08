@@ -7,6 +7,7 @@ import { Explorer } from './pages/Explorer'
 import { Assistant } from './pages/Assistant'
 import { Login } from './pages/Login'
 import { Signup } from './pages/Signup'
+import { Bookmarks } from './pages/Bookmarks'
 
 function App() {
   return (
@@ -21,6 +22,7 @@ function App() {
               <Route path="assistant" element={<Assistant />} />
               <Route path="login" element={<Login />} />
               <Route path="signup" element={<Signup />} />
+              <Route path="bookmarks" element={<Bookmarks />} />
             </Route>
           </Routes>
         </Router>
