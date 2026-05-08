@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+/* Make the `dark:` variant follow our manual `.dark` class toggle, not the
+   OS media query. Required in Tailwind v4 for class-based dark mode. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 /* ──────────────────────────────────────────────────────────────────────────
    LexIntell — Editorial palette
    Inspired by modern premium apps (Linear, Arc, Stripe): one confident
@@ -165,9 +169,10 @@
            text-transparent bg-clip-text;
   }
 
-  /* Page surface */
+  /* Page surface — transparent so the fixed world map background can show
+     through. The base colour is provided by <body>. Only the soft radial
+     gradient overlays live here. */
   .bg-gradient-dark {
-    @apply bg-paper dark:bg-ink-950;
     background-image:
       radial-gradient(1200px 600px at 80% -10%, rgba(91,95,232,0.06), transparent 60%),
       radial-gradient(900px 500px at -10% 110%, rgba(216,154,58,0.05), transparent 60%);
@@ -177,4 +182,54 @@
       radial-gradient(1200px 600px at 80% -10%, rgba(91,95,232,0.10), transparent 60%),
       radial-gradient(900px 500px at -10% 110%, rgba(216,154,58,0.06), transparent 60%);
   }
+
+  /* Page vignette — soft fade from transparent in the centre to the page
+     colour at the edges, so the world map watermark never competes with
+     content. Sits above the map but below all other content. */
+  .page-vignette {
+    background: radial-gradient(
+      ellipse at center,
+      transparent 28%,
+      rgba(247, 244, 237, 0.55) 75%,
+      rgba(247, 244, 237, 0.85) 100%
+    );
+  }
+  .dark .page-vignette {
+    background: radial-gradient(
+      ellipse at center,
+      transparent 28%,
+      rgba(7, 8, 15, 0.55) 70%,
+      rgba(7, 8, 15, 0.92) 100%
+    );
+  }
+}
+
+/* =========================================================================
+   Animations
+   ====================================================================== */
+
+@keyframes worldFloat {
+  0%, 100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  33% {
+    transform: translate3d(10px, -12px, 0) scale(1.012);
+  }
+  66% {
+    transform: translate3d(-8px, 8px, 0) scale(0.996);
+  }
+}
+
+@keyframes worldDrift {
+  from { background-position: 0% 50%; }
+  to   { background-position: 100% 50%; }
+}
+
+.world-float {
+  animation: worldFloat 32s ease-in-out infinite;
+  will-change: transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .world-float { animation: none; }
 }

@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
+import { AnimatePresence, motion } from 'framer-motion';
 import {
   BookOpen,
   Scale,
@@ -9,11 +10,15 @@ import {
   Sun,
   Moon,
   LogOut,
+  Home,
+  LogIn,
+  UserPlus,
   User as UserIcon,
 } from 'lucide-react';
 import { Button } from './Button';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
+import { WorldMap } from './WorldMap';
 
 export const Layout: React.FC = () => {
   const location = useLocation();
@@ -24,9 +29,25 @@ export const Layout: React.FC = () => {
   const [accountOpen, setAccountOpen] = useState(false);
 
   const navItems = [
-    { name: 'Explorer', path: '/explorer', icon: BookOpen },
-    { name: 'Assistant', path: '/assistant', icon: MessageSquare },
+    { name: 'Home', path: '/', icon: Home, exact: true },
+    { name: 'Explorer', path: '/explorer', icon: BookOpen, exact: false },
+    { name: 'Assistant', path: '/assistant', icon: MessageSquare, exact: false },
   ];
+
+  // Lock body scroll while the side drawer is open.
+  useEffect(() => {
+    if (!menuOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [menuOpen]);
+
+  // Close drawer when navigating.
+  useEffect(() => {
+    setMenuOpen(false);
+  }, [location.pathname]);
 
   const initials =
     (user?.user_metadata?.full_name as string | undefined)
@@ -45,9 +66,30 @@ export const Layout: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col font-sans">
+    <div className="min-h-screen flex flex-col font-sans relative isolate">
+      {/* ===== Background stack (fixed, behind everything) =====
+          Layered, from bottom to top:
+            1. The body's base colour (paper / ink-950)
+            2. The world map watermark, gently floating
+            3. A radial vignette so text near the centre stays crisp
+      */}
+      <div
+        aria-hidden="true"
+        className="fixed inset-0 -z-10 pointer-events-none flex items-center justify-center overflow-hidden"
+      >
+        <WorldMap
+          variant="silhouette"
+          fade
+          className="world-float w-[140%] max-w-[1800px] -translate-y-[3%] opacity-[0.20] dark:opacity-[0.22] dark:invert text-iris-500/30 dark:text-iris-300/25"
+        />
+      </div>
+      <div
+        aria-hidden="true"
+        className="fixed inset-0 -z-10 pointer-events-none page-vignette"
+      />
+
       {/* Top Navigation */}
-      <header className="sticky top-0 z-50 bg-white/80 dark:bg-world-navy/80 backdrop-blur-md border-b border-brand-slate/20 dark:border-brand-slate/30 transition-colors duration-300">
+      <header className="sticky top-0 z-50 bg-paper/85 dark:bg-ink-950/80 backdrop-blur-md border-b border-slate/15 dark:border-ink-700 transition-colors duration-300">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-20">
             {/* Logo */}
@@ -62,8 +104,10 @@ export const Layout: React.FC = () => {
 
             {/* Desktop Navigation */}
             <nav className="hidden md:flex items-center gap-8">
-              {navItems.map((item) => {
-                const isActive = location.pathname.startsWith(item.path);
+              {navItems.filter((i) => i.path !== '/').map((item) => {
+                const isActive = item.exact
+                  ? location.pathname === item.path
+                  : location.pathname.startsWith(item.path);
                 const Icon = item.icon;
                 return (
                   <Link
@@ -71,8 +115,8 @@ export const Layout: React.FC = () => {
                     to={item.path}
                     className={`flex items-center gap-2 text-sm font-medium transition-colors ${
                       isActive
-                        ? 'text-world-ocean'
-                        : 'text-brand-slate dark:text-brand-mist hover:text-world-deep-ocean dark:hover:text-world-sand'
+                        ? 'text-iris-500'
+                        : 'text-slate dark:text-mist hover:text-ink-100 dark:hover:text-paper'
                     }`}
                   >
                     <Icon className="w-4 h-4" />
@@ -139,82 +183,192 @@ export const Layout: React.FC = () => {
             </div>
 
             {/* Mobile Menu Button */}
-            <div className="flex md:hidden items-center gap-3">
+            <div className="flex md:hidden items-center gap-2">
               <button
                 onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-                className="p-2 text-brand-slate dark:text-brand-mist"
+                className="p-2 text-slate dark:text-mist hover:text-iris-500 transition-colors"
+                aria-label="Toggle dark mode"
               >
                 {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
               </button>
               <button
-                onClick={() => setMenuOpen((v) => !v)}
-                className="p-2 text-brand-slate dark:text-brand-mist"
-                aria-label="Menu"
+                onClick={() => setMenuOpen(true)}
+                className="p-2 text-slate dark:text-mist hover:text-iris-500 transition-colors"
+                aria-label="Open menu"
+                aria-expanded={menuOpen}
               >
-                {menuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+                <Menu className="w-6 h-6" />
               </button>
             </div>
           </div>
 
-          {/* Mobile drawer */}
-          {menuOpen && (
-            <div className="md:hidden border-t border-brand-slate/20 py-4 space-y-2">
-              {navItems.map((item) => {
-                const Icon = item.icon;
-                return (
-                  <Link
-                    key={item.name}
-                    to={item.path}
-                    onClick={() => setMenuOpen(false)}
-                    className="flex items-center gap-3 px-3 py-2 rounded-lg text-brand-slate dark:text-brand-mist hover:bg-brand-slate/10"
-                  >
-                    <Icon className="w-4 h-4" /> {item.name}
-                  </Link>
-                );
-              })}
-              <div className="pt-2 border-t border-brand-slate/20 flex flex-col gap-2 px-3">
+        </div>
+      </header>
+
+      {/* ===== Mobile slide-in side drawer ===== */}
+      <AnimatePresence>
+        {menuOpen && (
+          <motion.div
+            key="drawer"
+            className="md:hidden fixed inset-0 z-[60]"
+            initial={{ pointerEvents: 'none' }}
+            animate={{ pointerEvents: 'auto' }}
+            exit={{ pointerEvents: 'none' }}
+          >
+            {/* Backdrop */}
+            <motion.div
+              className="absolute inset-0 bg-ink-950/40 backdrop-blur-sm"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              onClick={() => setMenuOpen(false)}
+            />
+
+            {/* Drawer panel — slides from the right */}
+            <motion.aside
+              className="absolute right-0 top-0 h-full w-[85%] max-w-sm
+                         bg-paper-soft dark:bg-ink-900
+                         border-l border-slate/15 dark:border-ink-700
+                         shadow-2xl shadow-ink-900/30 dark:shadow-black/60
+                         flex flex-col"
+              initial={{ x: '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '100%' }}
+              transition={{ type: 'tween', duration: 0.28, ease: [0.32, 0.72, 0, 1] }}
+              role="dialog"
+              aria-modal="true"
+              aria-label="Main navigation"
+            >
+              {/* Drawer header */}
+              <div className="flex items-center justify-between h-20 px-5 border-b border-slate/15 dark:border-ink-700">
+                <Link
+                  to="/"
+                  onClick={() => setMenuOpen(false)}
+                  className="flex items-center gap-2.5"
+                >
+                  <div className="w-9 h-9 rounded-full bg-gradient-to-br from-region-americas via-honey-500 to-region-asia flex items-center justify-center text-white shadow">
+                    <Scale className="w-4 h-4" />
+                  </div>
+                  <span className="font-serif font-bold text-lg">
+                    Lex<span className="gradient-world">Intell</span>
+                  </span>
+                </Link>
+                <button
+                  onClick={() => setMenuOpen(false)}
+                  className="p-2 rounded-lg text-slate dark:text-mist hover:bg-slate/10"
+                  aria-label="Close menu"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* User card */}
+              {user && (
+                <div className="px-5 py-4 border-b border-slate/15 dark:border-ink-700">
+                  <div className="flex items-center gap-3">
+                    <span className="w-10 h-10 rounded-full bg-gradient-to-br from-iris-500 to-sage-500 text-white flex items-center justify-center text-sm font-semibold">
+                      {initials || <UserIcon className="w-4 h-4" />}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="text-xs uppercase tracking-wider text-slate dark:text-mist">
+                        Signed in as
+                      </div>
+                      <div className="text-sm font-medium truncate">
+                        {user.email}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Nav items */}
+              <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
+                {navItems.map((item) => {
+                  const isActive = item.exact
+                    ? location.pathname === item.path
+                    : location.pathname.startsWith(item.path);
+                  const Icon = item.icon;
+                  return (
+                    <Link
+                      key={item.name}
+                      to={item.path}
+                      onClick={() => setMenuOpen(false)}
+                      className={`flex items-center gap-3 px-3 py-3 rounded-xl text-[15px] transition-colors ${
+                        isActive
+                          ? 'bg-iris-500/10 text-iris-500 font-medium'
+                          : 'text-ink-100 dark:text-paper hover:bg-slate/10'
+                      }`}
+                    >
+                      <Icon className="w-5 h-5" /> {item.name}
+                    </Link>
+                  );
+                })}
+              </nav>
+
+              {/* Auth actions */}
+              <div className="border-t border-slate/15 dark:border-ink-700 p-4 space-y-2">
                 {user ? (
                   <button
                     onClick={handleSignOut}
-                    className="flex items-center gap-2 py-2 text-sm text-region-americas"
+                    className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-medium text-rose-500 border border-rose-500/30 hover:bg-rose-500/10 transition-colors"
                   >
-                    <LogOut className="w-4 h-4" /> Sign out ({user.email})
+                    <LogOut className="w-4 h-4" /> Sign out
                   </button>
                 ) : (
                   <>
-                    <Link to="/login" onClick={() => setMenuOpen(false)}>
-                      <Button variant="ghost" className="w-full">
-                        Log in
+                    <Link
+                      to="/login"
+                      onClick={() => setMenuOpen(false)}
+                      className="block"
+                    >
+                      <Button variant="secondary" className="w-full">
+                        <LogIn className="w-4 h-4" /> Log in
                       </Button>
                     </Link>
-                    <Link to="/signup" onClick={() => setMenuOpen(false)}>
-                      <Button className="w-full">Get Started</Button>
+                    <Link
+                      to="/signup"
+                      onClick={() => setMenuOpen(false)}
+                      className="block"
+                    >
+                      <Button className="w-full">
+                        <UserPlus className="w-4 h-4" /> Get Started
+                      </Button>
                     </Link>
                   </>
                 )}
               </div>
-            </div>
-          )}
-        </div>
-      </header>
+            </motion.aside>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      {/* Main Content Area */}
-      <main className="flex-1 bg-gradient-dark">
+      {/* Main Content Area — flex column so child pages can use flex-1 */}
+      <main className="flex-1 flex flex-col bg-gradient-dark">
         <Outlet />
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-brand-slate/20 dark:border-brand-slate/30 bg-world-sand/50 dark:bg-[#0A0F1A] py-8 transition-colors duration-300">
-        <div className="max-w-7xl mx-auto px-4 text-center text-sm text-brand-slate space-y-2">
+      <footer className="border-t border-slate/15 dark:border-ink-700 bg-paper/60 dark:bg-ink-950/70 backdrop-blur-sm py-6 md:py-8 transition-colors duration-300">
+        <div className="max-w-7xl mx-auto px-4 text-center text-xs md:text-sm text-slate dark:text-mist space-y-3">
           <div className="flex justify-center gap-1">
             <span className="w-2 h-2 rounded-full bg-region-americas" />
             <span className="w-2 h-2 rounded-full bg-region-oceania" />
-            <span className="w-2 h-2 rounded-full bg-world-earth" />
+            <span className="w-2 h-2 rounded-full bg-honey-500" />
             <span className="w-2 h-2 rounded-full bg-region-asia" />
-            <span className="w-2 h-2 rounded-full bg-world-ocean" />
+            <span className="w-2 h-2 rounded-full bg-iris-500" />
             <span className="w-2 h-2 rounded-full bg-region-europe" />
           </div>
-          <p>&copy; {new Date().getFullYear()} LexIntell — Global Constitutional Intelligence.</p>
+          <p>
+            &copy; {new Date().getFullYear()} LexIntell — Global Constitutional
+            Intelligence.
+          </p>
+          <p className="text-[11px] md:text-xs text-slate/80 dark:text-mist/80">
+            Powered by{' '}
+            <span className="font-semibold tracking-wide gradient-world">
+              Techinstant
+            </span>
+          </p>
         </div>
       </footer>
     </div>
