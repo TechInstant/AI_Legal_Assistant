@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(findstr /i \"env\")",
+      "PowerShell(Get-ChildItem -Force \"c:\\\\Users\\\\hp\\\\Desktop\\\\TheConstitution-class-app\" | Where-Object { $_.Name -match 'env' } | Select-Object Name)",
+      "Bash(npm run *)"
+    ]
+  }
+}

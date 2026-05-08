@@ -1,0 +1,180 @@
+@import "tailwindcss";
+
+/* ──────────────────────────────────────────────────────────────────────────
+   LexIntell — Editorial palette
+   Inspired by modern premium apps (Linear, Arc, Stripe): one confident
+   brand colour (Iris indigo), a warm editorial secondary (Honey amber),
+   calm sage for AI/success, and harmonized continent accents that blend
+   into the whole instead of fighting it.
+   ────────────────────────────────────────────────────────────────────── */
+
+@theme {
+  /* === Base inks & paper === */
+  --color-ink-950: #07080F;     /* deepest dark — page bg in dark mode */
+  --color-ink-900: #0E1322;     /* primary dark surface */
+  --color-ink-800: #1A2138;     /* elevated dark surface (cards) */
+  --color-ink-700: #283050;     /* dark mode borders */
+  --color-ink-100: #131A2C;     /* near-black on light */
+  --color-paper:   #F7F4ED;     /* warm bone — page bg in light mode */
+  --color-paper-soft: #FFFFFF;  /* light surface */
+  --color-mist:    #B6BAC5;     /* dark-mode secondary text */
+  --color-slate:   #5F6679;     /* light-mode secondary text */
+
+  /* === Brand: Iris (primary) === */
+  --color-iris-50:  #EEEEFE;
+  --color-iris-100: #DEDEFD;
+  --color-iris-300: #9FA1F4;
+  --color-iris-500: #5B5FE8;
+  --color-iris-600: #4A4ED8;
+  --color-iris-700: #3B3FB8;
+
+  /* === Editorial: Honey (premium accent) === */
+  --color-honey-100: #F8EDD3;
+  --color-honey-500: #D89A3A;
+  --color-honey-700: #A0701F;
+
+  /* === Sage (AI / success / "listen") === */
+  --color-sage-100: #D4F1E5;
+  --color-sage-500: #0F9A6E;
+  --color-sage-700: #097253;
+
+  /* === Rose (errors / destructive) === */
+  --color-rose-500: #C24F6E;
+
+  /* === Continental accents (muted/harmonized — not rainbow) === */
+  --color-region-africa:   #C46E3F;   /* warm clay */
+  --color-region-asia:     #4F8C5C;   /* sage green */
+  --color-region-europe:   #8C5B96;   /* dusty plum */
+  --color-region-americas: #B85D6E;   /* muted rose */
+  --color-region-oceania:  #5C9CA1;   /* dusty teal */
+  --color-region-arctic:   #7BA8C9;   /* powder blue */
+  --color-region-mideast:  #B58A4D;   /* soft saffron */
+
+  /* === Legacy token aliases — keep existing component class names working
+     by remapping them to the new palette. === */
+  --color-world-ocean:        var(--color-iris-500);
+  --color-world-deep-ocean:   var(--color-ink-100);
+  --color-world-navy:         var(--color-ink-950);
+  --color-world-forest:       var(--color-sage-500);
+  --color-world-teal:         var(--color-sage-700);
+  --color-world-earth:        var(--color-honey-500);
+  --color-world-sand:         var(--color-paper);
+  --color-brand-mist:         var(--color-mist);
+  --color-brand-slate:        var(--color-slate);
+  --color-brand-carbon:       var(--color-ink-800);
+  --color-brand-sapphire:     var(--color-iris-500);
+  --color-brand-ivory:        var(--color-paper);
+
+  /* === Typography === */
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-serif: 'Merriweather', 'Source Serif Pro', Georgia, serif;
+
+  /* === Radii === */
+  --radius-btn: 12px;
+  --radius-card: 18px;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Base — light mode by default; .dark on <html> flips it
+   ────────────────────────────────────────────────────────────────────── */
+@layer base {
+  html {
+    color-scheme: light;
+  }
+  html.dark {
+    color-scheme: dark;
+  }
+
+  body {
+    @apply bg-paper text-ink-100 font-sans antialiased transition-colors duration-300;
+    font-feature-settings: "ss01", "cv11";
+  }
+
+  .dark body {
+    @apply bg-ink-950 text-mist;
+  }
+
+  /* Headings */
+  h1, h2, h3, h4, h5, h6 {
+    @apply text-ink-100 tracking-tight;
+  }
+  .dark h1, .dark h2, .dark h3, .dark h4, .dark h5, .dark h6 {
+    @apply text-paper;
+  }
+
+  h1 { @apply text-4xl md:text-[44px] font-bold; line-height: 1.1; }
+  h2 { @apply text-3xl md:text-[32px] font-bold; line-height: 1.15; }
+  h3 { @apply text-xl md:text-2xl font-semibold; }
+  p  { @apply text-[16px] leading-relaxed; }
+
+  /* Selection */
+  ::selection {
+    background-color: var(--color-iris-500);
+    color: white;
+  }
+
+  /* Scrollbar — subtle */
+  *::-webkit-scrollbar { width: 10px; height: 10px; }
+  *::-webkit-scrollbar-track { background: transparent; }
+  *::-webkit-scrollbar-thumb {
+    background-color: rgb(95 102 121 / 0.25);
+    border-radius: 999px;
+  }
+  *::-webkit-scrollbar-thumb:hover {
+    background-color: rgb(95 102 121 / 0.45);
+  }
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Components
+   ────────────────────────────────────────────────────────────────────── */
+@layer components {
+  .btn-primary {
+    @apply bg-iris-500 text-white px-6 py-3 rounded-[12px] font-medium transition-all duration-200
+           hover:bg-iris-600 hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0;
+  }
+
+  .btn-secondary {
+    @apply bg-transparent text-ink-100 dark:text-paper border border-slate/40 dark:border-ink-700
+           px-6 py-3 rounded-[12px] font-medium transition-all duration-200
+           hover:border-iris-500 hover:text-iris-500 hover:shadow-[0_0_0_4px_rgba(91,95,232,0.12)];
+  }
+
+  /* Glass card — adapts to light/dark */
+  .card-glass {
+    @apply bg-paper-soft/90 dark:bg-ink-800/70 backdrop-blur-md
+           border border-slate/15 dark:border-ink-700
+           rounded-[18px]
+           shadow-[0_2px_8px_rgba(15,18,30,0.06)]
+           dark:shadow-[0_8px_32px_rgba(0,0,0,0.45)]
+           transition-colors duration-300;
+  }
+
+  /* Brand wordmark gradient */
+  .gradient-primary {
+    @apply bg-gradient-to-r from-iris-500 to-honey-500 text-transparent bg-clip-text;
+  }
+
+  .gradient-premium {
+    @apply bg-gradient-to-r from-honey-500 to-[#F0CB87] text-transparent bg-clip-text;
+  }
+
+  /* "World" gradient — refined: indigo → honey → sage (not rainbow) */
+  .gradient-world {
+    @apply bg-[linear-gradient(90deg,#5B5FE8_0%,#8C5B96_30%,#D89A3A_60%,#0F9A6E_100%)]
+           text-transparent bg-clip-text;
+  }
+
+  /* Page surface */
+  .bg-gradient-dark {
+    @apply bg-paper dark:bg-ink-950;
+    background-image:
+      radial-gradient(1200px 600px at 80% -10%, rgba(91,95,232,0.06), transparent 60%),
+      radial-gradient(900px 500px at -10% 110%, rgba(216,154,58,0.05), transparent 60%);
+  }
+  .dark .bg-gradient-dark {
+    background-image:
+      radial-gradient(1200px 600px at 80% -10%, rgba(91,95,232,0.10), transparent 60%),
+      radial-gradient(900px 500px at -10% 110%, rgba(216,154,58,0.06), transparent 60%);
+  }
+}
