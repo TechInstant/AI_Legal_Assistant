@@ -113,7 +113,43 @@ Supabase Dashboard → **Authentication** → **Providers** → **Email**:
 
 The app's signup flow already handles both modes — when email confirmation is required, [`Signup.tsx`](src/pages/Signup.tsx) shows the "check your inbox" message.
 
-### 2.d (Optional) Add more constitutions
+### 2.d Bulk-seed every country (one command)
+
+To get every country in REST Countries marked as **indexed**, run the seed script. It walks the full ~250-country catalogue, fetches each country's Wikipedia "Constitution of X" summary, and writes both the country profile and an Overview article to your Supabase `constitutions` and `articles` tables.
+
+**Steps:**
+
+1. Run `supabase/schema.sql` and `supabase/seed.sql` first (see §2.a).
+2. Grab your **Service Role key** from the Supabase Dashboard → Project Settings → API. (This bypasses RLS — never commit it.)
+3. Run the seed script:
+
+   PowerShell:
+   ```powershell
+   $env:SUPABASE_SERVICE_ROLE_KEY = "ey..."
+   npm run seed:supabase
+   ```
+
+   bash / zsh:
+   ```bash
+   SUPABASE_SERVICE_ROLE_KEY=ey... npm run seed:supabase
+   ```
+
+The script will print one line per country (`✓ overview`, `— (no Wikipedia article)`, `✗ error`), and finish with a summary of how many were inserted.
+
+**What you get afterwards:**
+- ~250 country profiles in `public.constitutions`
+- ~200 Overview articles in `public.articles` (one per country that has a "Constitution of X" Wikipedia entry)
+- Every country with an article shows the green **Indexed** badge in the Explorer
+- The AI Assistant's TF-IDF retriever now searches across the entire global corpus
+- Your bundled 8 are skipped — their richer per-article text stays authoritative
+
+**Source quality:** Wikipedia summaries are short (~3–5 sentences) and high-level. For richer per-article text on specific countries, manually add rows or write a follow-up script that pulls full constitutional text from [Wikisource](https://en.wikisource.org/) (which has full machine-readable text for ~50 constitutions).
+
+**Re-running:** the script uses upserts, so re-running is safe — newer Wikipedia content overwrites older.
+
+---
+
+### 2.e (Optional) Add more constitutions manually
 
 To add countries beyond the 8 bundled, run inserts directly:
 
@@ -131,15 +167,11 @@ values ('ke-art27', 'ke', 'Chapter Four — Bill of Rights', 'Article 27',
 
 The app will pick them up immediately — no redeploy needed.
 
-### 2.e (Optional) Bulk import from Wikipedia
+### 2.f (Advanced) Pulling full constitutional text from Wikisource
 
-Quick recipe in any Node script:
+The bulk script in §2.d uses Wikipedia summaries (short, ~3–5 sentences). For richer per-article text, [Wikisource](https://en.wikisource.org/) hosts full constitutions for ~50 countries (US, UK, Germany, etc.). Adapt the script with the MediaWiki `parse` API:
 
 ```js
-import { createClient } from '@supabase/supabase-js';
-
-const sb = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
-
 const wiki = await fetch(
   'https://en.wikisource.org/w/api.php?' +
   new URLSearchParams({
@@ -151,7 +183,8 @@ const wiki = await fetch(
   })
 ).then(r => r.json());
 
-// parse wiki.parse.wikitext into chapter/article rows, then:
+// Parse wiki.parse.wikitext (it's wikitext markup) into your article rows,
+// then upsert into the `articles` table.
 await sb.from('articles').upsert(rows);
 ```
 
