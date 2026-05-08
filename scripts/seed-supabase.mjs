@@ -1,26 +1,37 @@
 #!/usr/bin/env node
 /**
- * Seeds Supabase with every country in REST Countries + a Wikipedia
- * "Constitution of <Country>" overview article for each.
+ * Seeds Supabase with constitutional data from layered sources:
  *
- * After running this, every country in the Explorer will be `indexed: true`
- * (i.e. has at least one article) and the AI Assistant's TF-IDF retriever
- * will have ~200 documents to search instead of ~30.
+ *   1. Constitute Project (full text — chapters + articles)
+ *      https://www.constituteproject.org/service/
+ *   2. Wikipedia REST API (single-paragraph overview, fallback)
+ *      https://en.wikipedia.org/api/rest_v1/page/summary/...
+ *   3. REST Countries (country metadata for every nation)
+ *      https://restcountries.com/v3.1/all
+ *
+ * Idempotent — re-running upserts changed rows. Safe to schedule
+ * (see .github/workflows/seed.yml).
+ *
+ * Attribution required by Constitute's licence:
+ *   Comparative Constitutions Project. English translations used with
+ *   permission from HeinOnline and Oxford Constitutions of the World.
+ *   Arabic by International IDEA. Spanish by University of Los Andes.
  *
  * Prerequisites:
  *   1. supabase/schema.sql + supabase/seed.sql have been run.
- *   2. You have your Supabase Service Role key (Dashboard → Settings → API).
- *      NEVER commit it; service role bypasses RLS.
+ *   2. SUPABASE_SERVICE_ROLE_KEY is set (Dashboard → Settings → API).
+ *      NEVER commit the service role key — it bypasses RLS.
  *
  * Usage (PowerShell):
  *   $env:SUPABASE_SERVICE_ROLE_KEY="ey..."; npm run seed:supabase
  *
- * Usage (bash):
+ * Usage (bash / GitHub Actions):
  *   SUPABASE_SERVICE_ROLE_KEY=ey... npm run seed:supabase
  */
 
 import fs from 'node:fs';
 import { createClient } from '@supabase/supabase-js';
+import { parse as parseHtml } from 'node-html-parser';
 
 // ---------- Load .env so we can pick up VITE_SUPABASE_URL ----------
 try {
@@ -28,7 +39,6 @@ try {
   for (const line of dotenv.split('\n')) {
     const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.+?)\s*$/);
     if (m && !process.env[m[1]]) {
-      // Strip surrounding quotes if present
       process.env[m[1]] = m[2].replace(/^["']|["']$/g, '');
     }
   }
@@ -55,7 +65,54 @@ const sb = createClient(SUPABASE_URL, SERVICE_KEY, {
   auth: { persistSession: false },
 });
 
+// ---------- Key sanity check ----------
+// Decodes the JWT (legacy service_role) or recognises the new sb_secret_*
+// format. Catches the most common mistake: pasting the anon/publishable key.
+function detectKeyRole(key) {
+  if (key.startsWith('sb_secret_')) return 'service_role';
+  if (key.startsWith('sb_publishable_')) return 'anon';
+  const parts = key.split('.');
+  if (parts.length !== 3) return null;
+  try {
+    const b64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const padded = b64 + '='.repeat((4 - (b64.length % 4)) % 4);
+    const payload = JSON.parse(Buffer.from(padded, 'base64').toString('utf8'));
+    return payload.role || null;
+  } catch {
+    return null;
+  }
+}
+
+const detectedRole = detectKeyRole(SERVICE_KEY);
+if (detectedRole && detectedRole !== 'service_role') {
+  console.error(
+    `\n  Wrong Supabase key — detected role "${detectedRole}".\n`,
+  );
+  console.error('  RLS will block every write. You need the service_role key.');
+  console.error('  Find it at:');
+  console.error('    Supabase Dashboard → Project Settings → API → service_role');
+  console.error('  (or "sb_secret_*" on newer projects). NOT the anon key.\n');
+  process.exit(2);
+}
+
+// ---------- Constants ----------
+
+const CONSTITUTE_BASE = 'https://www.constituteproject.org/service';
+const ATTRIBUTION =
+  'Source: Constitute Project (Comparative Constitutions Project). ' +
+  'English translation used with permission from HeinOnline and ' +
+  'Oxford Constitutions of the World.';
+
+const HEADERS = {
+  'User-Agent': 'LexIntell/1.0 (educational; contact via repo)',
+  Accept: 'application/json',
+};
+
+// Politeness delay between API calls.
+const DELAY_MS = 220;
+
 // ---------- Region mapping ----------
+
 const MIDEAST_SUBREGIONS = new Set(['Western Asia', 'Middle East']);
 const mapRegion = (region, subregion) => {
   if (region === 'Asia' && subregion && MIDEAST_SUBREGIONS.has(subregion)) {
@@ -72,10 +129,8 @@ const mapRegion = (region, subregion) => {
   }
 };
 
-// ---------- Bundled IDs (don't overwrite their richer text) ----------
-const BUNDLED = new Set(['us', 'ng', 'in', 'de', 'za', 'br', 'jp', 'au']);
-
 // ---------- Helpers ----------
+
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 async function fetchCountries() {
@@ -88,13 +143,168 @@ async function fetchCountries() {
   return await res.json();
 }
 
-const WIKI_HEADERS = {
-  'User-Agent': 'LexIntell/1.0 (educational; contact via repo)',
-  Accept: 'application/json',
-};
+// ---------- Constitute Project ----------
+
+let constituteIndex = null;
+
+async function loadConstituteIndex() {
+  if (constituteIndex) return constituteIndex;
+  const res = await fetch(`${CONSTITUTE_BASE}/constitutions?lang=en`, {
+    headers: HEADERS,
+  });
+  if (!res.ok) throw new Error(`Constitute index HTTP ${res.status}`);
+  const data = await res.json();
+
+  const byCountryId = new Map();
+  for (const c of data) {
+    if (!c.in_force) continue;
+    if (c.is_draft) continue;
+    // Constitute returns translations alongside English originals; skip
+    // entries explicitly tagged with a non-English language.
+    const lang = (c.language || '').toLowerCase();
+    if (lang && lang !== 'en') continue;
+
+    const existing = byCountryId.get(c.country_id);
+    const year = Number(c.year_revised || c.year_enacted) || 0;
+    const existingYear = existing
+      ? Number(existing.year_revised || existing.year_enacted) || 0
+      : -1;
+    if (year >= existingYear) byCountryId.set(c.country_id, c);
+  }
+  constituteIndex = byCountryId;
+  return constituteIndex;
+}
+
+// REST Countries → Constitute country_id matcher.
+// Constitute IDs use country names with underscores; some end in "_the"
+// (e.g. "Netherlands_the"). We try a handful of normalizations.
+function matchToConstitute(restCountry, index) {
+  const norm = (s) =>
+    s
+      .replace(/[\.,'’]/g, '')
+      .replace(/\s+/g, '_')
+      .replace(/_+/g, '_');
+  const common = restCountry.name.common;
+  const official = restCountry.name.official;
+  const candidates = [
+    norm(common),
+    norm(official),
+    norm(common.replace(/^The /i, '')),
+    norm(official.replace(/^The /i, '')),
+    norm(common) + '_the',
+    norm(common.replace(/^The /i, '')) + '_the',
+    // Hard-coded aliases for tricky names. Extend as needed.
+    common === 'United States' ? 'United_States_of_America' : null,
+    common === 'Czechia' ? 'Czech_Republic' : null,
+    common === 'Myanmar' ? 'Myanmar_Burma' : null,
+    common === 'East Timor' ? 'Timor-Leste' : null,
+    common === 'Eswatini' ? 'Swaziland' : null,
+    common === 'North Macedonia' ? 'Macedonia' : null,
+    common === 'Cape Verde' ? 'Cabo_Verde' : null,
+    common === 'Ivory Coast' ? 'Cote_dIvoire' : null,
+  ].filter(Boolean);
+
+  for (const c of candidates) {
+    if (index.has(c)) return index.get(c);
+  }
+  return null;
+}
+
+async function fetchConstituteHtml(consId) {
+  const res = await fetch(
+    `${CONSTITUTE_BASE}/html?cons_id=${encodeURIComponent(consId)}&lang=en`,
+    { headers: HEADERS },
+  );
+  if (!res.ok) return null;
+  const json = await res.json();
+  return typeof json.html === 'string' && json.html.length > 0 ? json.html : null;
+}
+
+// Walks the Constitute HTML in document order and groups paragraphs under
+// their nearest preceding heading. <h2> sets the chapter; <h3> matching
+// /^Article\s+/ starts a new article; other <h3>s update the chapter.
+function parseConstitute(html) {
+  const root = parseHtml(html);
+
+  const articles = [];
+  let currentChapter = '';
+  let pendingHeading = null;
+  let pendingParas = [];
+  let ord = 0;
+
+  function flush() {
+    if (pendingHeading && pendingParas.length > 0) {
+      const heading = pendingHeading.replace(/\s+/g, ' ').trim();
+      const m = heading.match(
+        /^Article\s+([\d.IVXLCMivxlcm]+\w*)\s*[\-—.:]?\s*(.*)$/i,
+      );
+      const article_number = m ? `Article ${m[1]}` : heading;
+      const explicitTitle = m && m[2] && m[2].trim();
+      // Fallback title: first sentence of content, capped at 70 chars.
+      // Avoids the ugly "Article 1 — Article 1" rendering when the source
+      // has no descriptive heading.
+      const fallbackTitle = pendingParas[0]
+        ? pendingParas[0].split(/[.!?](?:\s|$)/)[0].slice(0, 70).trim()
+        : '';
+      const title = explicitTitle || fallbackTitle || article_number;
+      articles.push({
+        ord: ord++,
+        chapter: currentChapter || 'General Provisions',
+        article_number,
+        title,
+        content: pendingParas.join('\n\n'),
+      });
+    }
+    pendingHeading = null;
+    pendingParas = [];
+  }
+
+  function classOf(node) {
+    return (node.attributes && node.attributes.class) || '';
+  }
+
+  function walk(node) {
+    if (!node) return;
+    const tag = node.tagName ? node.tagName.toLowerCase() : '';
+    if (tag === 'h2') {
+      flush();
+      const text = (node.text || '').trim();
+      currentChapter = text;
+      if (/^preamble$/i.test(text)) {
+        pendingHeading = 'Preamble';
+      }
+      // don't descend into headings
+      return;
+    }
+    if (tag === 'h3') {
+      flush();
+      const text = (node.text || '').trim();
+      if (/^Article\b/i.test(text)) {
+        pendingHeading = text;
+      } else {
+        // chapter-level heading expressed as h3 (e.g., "CHAPTER I. ...")
+        currentChapter = text;
+      }
+      return;
+    }
+    if (tag === 'p' && classOf(node).includes('content')) {
+      const t = (node.text || '').trim();
+      if (t) pendingParas.push(t);
+      return;
+    }
+    if (node.childNodes) {
+      for (const ch of node.childNodes) walk(ch);
+    }
+  }
+
+  walk(root);
+  flush();
+  return articles;
+}
+
+// ---------- Wikipedia (fallback) ----------
 
 async function fetchWikipediaSummary(countryName) {
-  // Try a few title variants because Wikipedia is inconsistent.
   const variants = [
     `Constitution of ${countryName}`,
     `Constitution of the ${countryName}`,
@@ -104,7 +314,7 @@ async function fetchWikipediaSummary(countryName) {
     try {
       const res = await fetch(
         `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title.replace(/\s+/g, '_'))}`,
-        { headers: WIKI_HEADERS },
+        { headers: HEADERS },
       );
       if (!res.ok) continue;
       const json = await res.json();
@@ -122,17 +332,47 @@ async function fetchWikipediaSummary(countryName) {
   return null;
 }
 
-// ---------- Main ----------
-async function main() {
-  console.log('\nFetching country list from REST Countries…');
-  const countries = await fetchCountries();
-  console.log(`Got ${countries.length} countries.\n`);
+// ---------- Supabase write helpers ----------
 
-  let inserted = 0;
-  let withOverview = 0;
-  let skipped = 0;
-  let failed = 0;
+async function upsertConstitution(row) {
+  const { error } = await sb.from('constitutions').upsert(row);
+  return error;
+}
+
+async function replaceArticles(constitutionId, rows) {
+  // Upsert all new rows in chunks…
+  for (let i = 0; i < rows.length; i += 50) {
+    const chunk = rows.slice(i, i + 50);
+    const { error } = await sb.from('articles').upsert(chunk);
+    if (error) return error;
+  }
+  // …then drop any leftover rows from a previous, larger revision.
+  const { error: dErr } = await sb
+    .from('articles')
+    .delete()
+    .eq('constitution_id', constitutionId)
+    .gte('ord', rows.length);
+  return dErr || null;
+}
+
+// ---------- Main ----------
+
+async function main() {
+  console.log('\nLoading Constitute Project index…');
+  const cIndex = await loadConstituteIndex();
+  console.log(
+    `Constitute: ${cIndex.size} in-force constitutions available in English.\n`,
+  );
+
+  console.log('Fetching country list from REST Countries…');
+  const countries = await fetchCountries();
+  console.log(`REST Countries: ${countries.length} countries.\n`);
+
   let total = 0;
+  let withConstitute = 0;
+  let withWiki = 0;
+  let articlesWritten = 0;
+  let failed = 0;
 
   for (const c of countries) {
     total++;
@@ -140,44 +380,101 @@ async function main() {
     const country = c.name.common;
     const region = mapRegion(c.region, c.subregion);
 
-    if (BUNDLED.has(id)) {
-      skipped++;
-      console.log(
-        `[${total}/${countries.length}] ${c.flag} ${country.padEnd(28)} — skipped (bundled)`,
-      );
-      continue;
-    }
-
     process.stdout.write(
-      `[${total}/${countries.length}] ${c.flag} ${country.padEnd(28)} `,
+      `[${String(total).padStart(3)}/${countries.length}] ${c.flag} ${country.padEnd(34)} `,
     );
 
-    const wiki = await fetchWikipediaSummary(country);
+    const cMatch = matchToConstitute(c, cIndex);
+    let parsedArticles = null;
+    let adopted = '';
+    let summary = '';
 
+    // 1) Constitute (preferred)
+    if (cMatch) {
+      try {
+        const html = await fetchConstituteHtml(cMatch.id);
+        await sleep(DELAY_MS);
+        if (html) {
+          parsedArticles = parseConstitute(html);
+          if (parsedArticles.length === 0) parsedArticles = null;
+        }
+      } catch (err) {
+        process.stdout.write(`(constitute err: ${err.message}) `);
+      }
+
+      if (parsedArticles) {
+        adopted = String(cMatch.year_revised || cMatch.year_enacted || '');
+        const firstPara = parsedArticles[0]?.content?.slice(0, 380) || '';
+        summary = `${firstPara}…\n\n${ATTRIBUTION}`.trim();
+      }
+    }
+
+    // 2) Wikipedia fallback
+    let wiki = null;
+    if (!parsedArticles) {
+      wiki = await fetchWikipediaSummary(country);
+      await sleep(DELAY_MS);
+      if (wiki) summary = wiki.extract.slice(0, 480);
+    }
+
+    // Upsert constitution row
     const constitutionRow = {
       id,
       country,
       country_code: c.cca2,
       flag: c.flag,
       region,
-      title: `Constitution of ${country}`,
-      adopted: '',
-      summary: wiki ? wiki.extract.slice(0, 480) : '',
+      title: parsedArticles
+        ? `Constitution of ${country}`
+        : wiki
+          ? `Constitution of ${country}`
+          : `Constitution of ${country}`,
+      adopted,
+      summary,
     };
-
-    const { error: cErr } = await sb
-      .from('constitutions')
-      .upsert(constitutionRow);
+    const cErr = await upsertConstitution(constitutionRow);
     if (cErr) {
       console.log(`✗ ${cErr.message}`);
+      // RLS on the very first row means the key can't write at all — bail
+      // out instead of grinding through 250 doomed inserts.
+      if (
+        cErr.message &&
+        cErr.message.includes('row-level security') &&
+        total <= 3
+      ) {
+        console.error('\n  Supabase rejected the write under RLS.');
+        console.error('  The script needs the service_role (secret) key.');
+        console.error(
+          '  Get it from: Supabase Dashboard → Project Settings → API.\n',
+        );
+        process.exit(2);
+      }
       failed++;
-      await sleep(250);
       continue;
     }
-    inserted++;
 
-    if (wiki) {
-      const articleRow = {
+    // Write articles
+    if (parsedArticles) {
+      const rows = parsedArticles.map((a) => ({
+        id: `${id}-cp-${String(a.ord).padStart(3, '0')}`,
+        constitution_id: id,
+        chapter: a.chapter,
+        article_number: a.article_number,
+        title: a.title || a.article_number,
+        content: a.content,
+        ord: a.ord,
+      }));
+      const err = await replaceArticles(id, rows);
+      if (err) {
+        console.log(`✗ articles: ${err.message}`);
+        failed++;
+      } else {
+        withConstitute++;
+        articlesWritten += rows.length;
+        console.log(`✓ Constitute (${rows.length} articles)`);
+      }
+    } else if (wiki) {
+      const overview = {
         id: `${id}-overview`,
         constitution_id: id,
         chapter: 'Overview',
@@ -186,33 +483,29 @@ async function main() {
         content: `${wiki.extract}\n\nSource: ${wiki.url}`,
         ord: 0,
       };
-      const { error: aErr } = await sb.from('articles').upsert(articleRow);
-      if (aErr) {
-        console.log(`profile ✓  article ✗ (${aErr.message})`);
+      const err = await replaceArticles(id, [overview]);
+      if (err) {
+        console.log(`profile ✓ article ✗ (${err.message})`);
+        failed++;
       } else {
-        console.log('✓ overview');
-        withOverview++;
+        withWiki++;
+        articlesWritten += 1;
+        console.log('✓ Wikipedia overview');
       }
     } else {
-      console.log('— (no Wikipedia article)');
+      console.log('— (profile only)');
     }
-
-    // Be polite to Wikipedia.
-    await sleep(220);
   }
 
-  console.log('\n' + '='.repeat(60));
+  console.log('\n' + '='.repeat(64));
   console.log(`Total countries processed:        ${total}`);
-  console.log(`Constitution profiles upserted:   ${inserted}`);
-  console.log(`Wikipedia overviews added:        ${withOverview}`);
-  console.log(`Skipped (already bundled):        ${skipped}`);
+  console.log(`Indexed via Constitute Project:   ${withConstitute}`);
+  console.log(`Indexed via Wikipedia overview:   ${withWiki}`);
+  console.log(`Total article rows written:       ${articlesWritten}`);
   console.log(`Failed:                           ${failed}`);
-  console.log('='.repeat(60));
+  console.log('='.repeat(64));
   console.log(
-    '\nThe app will pick these up automatically — no rebuild needed.',
-  );
-  console.log(
-    'Countries with at least one article will show the green "Indexed" badge.\n',
+    '\nThe app will pick these up automatically — no rebuild needed.\n',
   );
 }
 

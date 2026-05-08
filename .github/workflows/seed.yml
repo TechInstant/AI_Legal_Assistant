@@ -1,0 +1,56 @@
+name: Seed constitutional data
+
+# Refreshes Supabase from the Constitute Project + Wikipedia weekly.
+# Idempotent — upserts replace changed text; manual runs are safe.
+#
+# Required repo secrets (Settings → Secrets and variables → Actions):
+#   VITE_SUPABASE_URL          your project URL, e.g. https://xxx.supabase.co
+#   SUPABASE_SERVICE_ROLE_KEY  service_role key (NOT anon). Bypasses RLS.
+
+on:
+  schedule:
+    # Sunday 03:00 UTC. Cron is in UTC. Adjust if you prefer another time.
+    - cron: '0 3 * * 0'
+  workflow_dispatch:
+    # Adds a "Run workflow" button on the Actions tab for ad-hoc refreshes.
+
+# Cancel a previous run if a new one starts (e.g. manual trigger during cron).
+concurrency:
+  group: seed-supabase
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  seed:
+    name: Refresh Supabase
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run seed
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: npm run seed:supabase | tee seed.log
+
+      - name: Summarize run
+        if: always()
+        run: |
+          echo "## Seed result" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          tail -n 12 seed.log >> "$GITHUB_STEP_SUMMARY" || true
+          echo '```' >> "$GITHUB_STEP_SUMMARY"

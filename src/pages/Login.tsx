@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Loader2, LogIn, ShieldCheck } from 'lucide-react';
+import { Loader2, LogIn, ShieldCheck, Eye, EyeOff } from 'lucide-react';
 import { Card } from '../components/Card';
 import { Button } from '../components/Button';
 import { useAuth } from '../context/AuthContext';
@@ -13,6 +13,7 @@ export const Login: React.FC = () => {
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -60,16 +61,28 @@ export const Login: React.FC = () => {
 
           <label className="block text-sm space-y-1">
             <span className="text-brand-slate dark:text-brand-mist">Password</span>
-            <input
-              type="password"
-              required
-              minLength={6}
-              autoComplete="current-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full bg-white dark:bg-world-navy/60 border border-brand-slate/30 rounded-xl py-3 px-4 outline-none focus:border-world-ocean transition-colors"
-              placeholder="••••••••"
-            />
+            <div className="relative">
+              <input
+                type={showPassword ? 'text' : 'password'}
+                required
+                minLength={6}
+                autoComplete="current-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full bg-white dark:bg-world-navy/60 border border-brand-slate/30 rounded-xl py-3 pl-4 pr-12 outline-none focus:border-world-ocean transition-colors"
+                placeholder="••••••••"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+                aria-pressed={showPassword}
+                className="absolute inset-y-0 right-0 px-3 flex items-center text-brand-slate hover:text-world-ocean dark:text-brand-mist dark:hover:text-world-ocean transition-colors"
+                tabIndex={-1}
+              >
+                {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+              </button>
+            </div>
           </label>
 
           {error && (

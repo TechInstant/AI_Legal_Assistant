@@ -1,4 +1,6 @@
+# ──────────────────────────────────────────────────────────────────
 # Logs
+# ──────────────────────────────────────────────────────────────────
 logs
 *.log
 npm-debug.log*
@@ -7,19 +9,64 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# ──────────────────────────────────────────────────────────────────
+# Build & dependencies
+# ──────────────────────────────────────────────────────────────────
 node_modules
 dist
 dist-ssr
+build
+.vite/
+*.tsbuildinfo
+.eslintcache
+coverage/
+
+# ──────────────────────────────────────────────────────────────────
+# Environment files — never commit secrets
+# Keep .env tracked only if it holds non-secret defaults; otherwise
+# keep this line. .env.*.local always stays local.
+# ──────────────────────────────────────────────────────────────────
+.env
+.env.local
+.env.*.local
 *.local
 
-# Editor directories and files
+# ──────────────────────────────────────────────────────────────────
+# Hosting / deploy caches
+# ──────────────────────────────────────────────────────────────────
+.netlify/
+.vercel/
+
+# ──────────────────────────────────────────────────────────────────
+# Editor & IDE
+# ──────────────────────────────────────────────────────────────────
 .vscode/*
 !.vscode/extensions.json
 .idea
-.DS_Store
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
-.env
+
+# ──────────────────────────────────────────────────────────────────
+# OS junk
+# ──────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# ──────────────────────────────────────────────────────────────────
+# Office / temp lock files
+# ──────────────────────────────────────────────────────────────────
+~$*
+*.bak
+*.tmp
+
+# ──────────────────────────────────────────────────────────────────
+# Claude / agent local state — already gitignored by Claude Code,
+# kept here as a belt-and-suspenders.
+# ──────────────────────────────────────────────────────────────────
+.claude/settings.local.json

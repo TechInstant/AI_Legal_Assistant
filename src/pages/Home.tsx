@@ -95,7 +95,7 @@ export const Home: React.FC = () => {
 
         <div className="max-w-4xl mx-auto space-y-5 sm:space-y-7 md:space-y-8 relative">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-slate/30 dark:border-ink-700 text-[10px] sm:text-xs uppercase tracking-wider text-slate dark:text-mist bg-paper-soft/60 dark:bg-ink-800/60 backdrop-blur-sm">
-            <Sparkles className="w-3.5 h-3.5 text-iris-500" />
+            <Sparkles className="w-3.5 h-3.5 text-green-500" />
             Global Legal Intelligence
           </div>
 

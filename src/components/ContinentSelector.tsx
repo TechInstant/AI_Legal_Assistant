@@ -36,9 +36,9 @@ export const ContinentSelector: React.FC<ContinentSelectorProps> = ({
   const baseChip =
     'inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border text-sm transition-all duration-200';
   const inactive =
-    'border-slate/30 dark:border-ink-700 text-slate dark:text-mist hover:text-iris-500 hover:border-iris-500/60';
+    'border-slate/30 dark:border-ink-700 text-slate dark:text-mist hover:text-brand-500 hover:border-brand-500/60';
   const active =
-    'border-iris-500 text-iris-500 bg-iris-500/5 shadow-[0_0_0_3px_rgba(91,95,232,0.10)]';
+    'border-brand-500 text-brand-500 bg-brand-500/5 shadow-[0_0_0_3px_rgba(36,119,45,0.10)]';
 
   return (
     <div className={`flex flex-wrap gap-2 ${className}`}>

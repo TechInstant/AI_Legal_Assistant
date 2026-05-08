@@ -24,13 +24,25 @@
   --color-mist:    #C8CCD6;     /* dark-mode secondary text (lifted for contrast) */
   --color-slate:   #5F6679;     /* light-mode secondary text */
 
-  /* === Brand: Iris (primary) === */
-  --color-iris-50:  #EEEEFE;
-  --color-iris-100: #DEDEFD;
-  --color-iris-300: #9FA1F4;
-  --color-iris-500: #5B5FE8;
-  --color-iris-600: #4A4ED8;
-  --color-iris-700: #3B3FB8;
+  /* === Brand: Forest green — single source of truth ===
+     Change --color-brand-500 and every accent in the app updates:
+     buttons, links, hovers, focus rings, text selection, active TOC items,
+     and the legacy iris and world-ocean tokens (aliased below). === */
+  --color-brand-50:  #E9F4EB;
+  --color-brand-100: #D4EBD7;
+  --color-brand-300: #7FBE89;
+  --color-brand-500: #24772D;   /* primary */
+  --color-brand-600: #1D5F24;   /* hover */
+  --color-brand-700: #15461B;   /* active / pressed */
+
+  /* === Iris aliases — kept so existing `iris-*` utility classes across the
+     codebase keep compiling, but they now resolve to the green brand. === */
+  --color-iris-50:  var(--color-brand-50);
+  --color-iris-100: var(--color-brand-100);
+  --color-iris-300: var(--color-brand-300);
+  --color-iris-500: var(--color-brand-500);
+  --color-iris-600: var(--color-brand-600);
+  --color-iris-700: var(--color-brand-700);
 
   /* === Editorial: Honey (premium accent) === */
   --color-honey-100: #F8EDD3;
@@ -150,14 +162,15 @@
    ────────────────────────────────────────────────────────────────────── */
 @layer components {
   .btn-primary {
-    @apply bg-iris-500 text-white px-6 py-3 rounded-[12px] font-medium transition-all duration-200
-           hover:bg-iris-600 hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0;
+    @apply bg-brand-500 text-white px-6 py-3 rounded-[12px] font-medium transition-all duration-200
+           hover:bg-brand-600 hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0
+           active:bg-brand-700;
   }
 
   .btn-secondary {
     @apply bg-transparent text-ink-100 dark:text-paper border border-slate/40 dark:border-ink-700
            px-6 py-3 rounded-[12px] font-medium transition-all duration-200
-           hover:border-iris-500 hover:text-iris-500 hover:shadow-[0_0_0_4px_rgba(91,95,232,0.12)];
+           hover:border-brand-500 hover:text-brand-500 hover:shadow-[0_0_0_4px_rgba(36,119,45,0.12)];
   }
 
   /* Glass card — adapts to light/dark */
@@ -179,9 +192,9 @@
     @apply bg-gradient-to-r from-honey-500 to-[#F0CB87] text-transparent bg-clip-text;
   }
 
-  /* "World" gradient — refined: indigo → honey → sage (not rainbow) */
+  /* "World" gradient — brand green → honey → sage (no blue/purple) */
   .gradient-world {
-    @apply bg-[linear-gradient(90deg,#5B5FE8_0%,#8C5B96_30%,#D89A3A_60%,#0F9A6E_100%)]
+    @apply bg-[linear-gradient(90deg,#24772D_0%,#7FBE89_30%,#D89A3A_65%,#0F9A6E_100%)]
            text-transparent bg-clip-text;
   }
 
@@ -190,12 +203,12 @@
      gradient overlays live here. */
   .bg-gradient-dark {
     background-image:
-      radial-gradient(1200px 600px at 80% -10%, rgba(91,95,232,0.06), transparent 60%),
+      radial-gradient(1200px 600px at 80% -10%, rgba(36,119,45,0.06), transparent 60%),
       radial-gradient(900px 500px at -10% 110%, rgba(216,154,58,0.05), transparent 60%);
   }
   .dark .bg-gradient-dark {
     background-image:
-      radial-gradient(1200px 600px at 80% -10%, rgba(91,95,232,0.10), transparent 60%),
+      radial-gradient(1200px 600px at 80% -10%, rgba(36,119,45,0.10), transparent 60%),
       radial-gradient(900px 500px at -10% 110%, rgba(216,154,58,0.06), transparent 60%);
   }
 
