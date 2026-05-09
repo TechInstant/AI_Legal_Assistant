@@ -1,14 +1,5 @@
 // OpenRouter streaming client — used to call Llama 3.3 (or any other model)
 // for retrieval-augmented answers.
-//
-// Configure via .env:
-//   VITE_OPENROUTER_API_KEY=...                          (required to enable RAG)
-//   VITE_OPENROUTER_MODEL=meta-llama/llama-3.3-70b-instruct:free  (optional)
-//
-// SECURITY NOTE: shipping an API key in a Vite frontend exposes it. We use
-// the `:free` model variant by default so worst-case abuse is rate-limited
-// rather than billed. For production, proxy this call through a Supabase
-// Edge Function and remove the key from the browser bundle.
 
 import type { ScoredArticle } from './ai';
 
