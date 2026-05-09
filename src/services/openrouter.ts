@@ -52,34 +52,54 @@ interface StreamChunk {
   choices?: Array<{ delta?: { content?: string } }>;
 }
 
+async function postWithRetry(
+  body: string,
+  signal: AbortSignal | undefined,
+): Promise<Response> {
+  const headers = {
+    Authorization: `Bearer ${apiKey}`,
+    'Content-Type': 'application/json',
+    'HTTP-Referer':
+      typeof window !== 'undefined' ? window.location.origin : 'https://lexintell.app',
+    'X-Title': 'LexIntell',
+  };
+
+  // Retry-once on 429 — handles brief upstream rate-limit blips on the
+  // free Llama tier. The fallback to local quotation answers handles
+  // longer-lived rate limits.
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const res = await fetch(API_URL, { method: 'POST', headers, body, signal });
+    if (res.status !== 429) return res;
+    if (attempt === 1) return res;
+    // Honour Retry-After when present, capped at 4s; otherwise 1.5s.
+    const retryAfter = Number(res.headers.get('Retry-After')) * 1000;
+    const wait = Number.isFinite(retryAfter) && retryAfter > 0
+      ? Math.min(retryAfter, 4000)
+      : 1500;
+    await new Promise((r) => setTimeout(r, wait));
+  }
+  // Unreachable — the loop always returns.
+  throw new Error('OpenRouter retry loop exhausted');
+}
+
 export const streamRAG = async (opts: RagOptions): Promise<void> => {
   if (!apiKey) throw new Error('OpenRouter API key not configured.');
 
   const userMessage =
     `Question: ${opts.question}\n\nSOURCES:\n${buildContext(opts.sources)}`;
 
-  const res = await fetch(API_URL, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-      // OpenRouter encourages these for analytics; both optional.
-      'HTTP-Referer':
-        typeof window !== 'undefined' ? window.location.origin : 'https://lexintell.app',
-      'X-Title': 'LexIntell',
-    },
-    body: JSON.stringify({
-      model,
-      stream: true,
-      temperature: 0.2,
-      max_tokens: 800,
-      messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
-        { role: 'user', content: userMessage },
-      ],
-    }),
-    signal: opts.signal,
+  const body = JSON.stringify({
+    model,
+    stream: true,
+    temperature: 0.2,
+    max_tokens: 800,
+    messages: [
+      { role: 'system', content: SYSTEM_PROMPT },
+      { role: 'user', content: userMessage },
+    ],
   });
+
+  const res = await postWithRetry(body, opts.signal);
 
   if (!res.ok || !res.body) {
     let detail = '';

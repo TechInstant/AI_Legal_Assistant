@@ -20,6 +20,14 @@ create table if not exists public.constitutions (
   created_at    timestamptz not null default now()
 );
 
+-- Country metadata. Idempotent — safe to re-run on existing projects.
+alter table public.constitutions
+  add column if not exists capital         text,
+  add column if not exists population      bigint,
+  add column if not exists languages       text[],
+  add column if not exists subregion       text,
+  add column if not exists flag_image_url  text;
+
 create table if not exists public.articles (
   id                text primary key,
   constitution_id   text not null references public.constitutions(id) on delete cascade,

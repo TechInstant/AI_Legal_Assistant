@@ -66,7 +66,12 @@ $RECYCLE.BIN/
 *.tmp
 
 # ──────────────────────────────────────────────────────────────────
-# Claude / agent local state — already gitignored by Claude Code,
+# Claude / agent local state 
 # kept here as a belt-and-suspenders.
 # ──────────────────────────────────────────────────────────────────
 .claude/settings.local.json
+
+.Agent/
+*.md
+.Brand-Guideline.md
+.DEPLOY.md

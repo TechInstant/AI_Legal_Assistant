@@ -4,6 +4,11 @@
 // API key is configured, the retrieved articles are also fed to Llama 3.3
 // as RAG context for a generated, cited answer. Otherwise we return the
 // best-matching quotation directly — no model required.
+//
+// Corpus sources, in priority order:
+//   1. Supabase (every country fetched by the seed script — ~250 covered)
+//   2. Bundled fallback (29 countries shipped in the binary, used while the
+//      Supabase preload is still in flight or if Supabase is unreachable)
 
 import {
   articles as bundledArticles,
@@ -11,6 +16,12 @@ import {
   type BundledArticle,
   type BundledConstitution,
 } from '../data/constitutions';
+import {
+  fetchAllArticles,
+  fetchConstitutions,
+  type Article,
+  type Constitution,
+} from './api';
 import {
   isOpenRouterConfigured,
   openRouterModel,
@@ -24,8 +35,8 @@ export interface CitedAnswer {
 }
 
 export interface ScoredArticle {
-  article: BundledArticle;
-  constitution: BundledConstitution;
+  article: BundledArticle | Article;
+  constitution: BundledConstitution | Constitution;
   score: number;
 }
 
@@ -48,63 +59,125 @@ function tokenize(text: string): string[] {
 }
 
 interface IndexEntry {
-  article: BundledArticle;
-  constitution: BundledConstitution;
+  article: BundledArticle | Article;
+  constitution: BundledConstitution | Constitution;
   termFreq: Map<string, number>;
   length: number;
 }
 
-let indexCache: {
+interface CorpusIndex {
   entries: IndexEntry[];
   idf: Map<string, number>;
-} | null = null;
+  boosts: Array<{ pattern: RegExp; id: string }>;
+  source: 'bundled' | 'supabase';
+}
 
-function buildIndex() {
-  if (indexCache) return indexCache;
-  const cById = new Map(bundledConstitutions.map((c) => [c.id, c]));
-  const entries: IndexEntry[] = bundledArticles.map((a) => {
-    const tokens = tokenize(`${a.title} ${a.content} ${a.chapter}`);
-    const tf = new Map<string, number>();
-    tokens.forEach((t) => tf.set(t, (tf.get(t) ?? 0) + 1));
-    return {
-      article: a,
-      constitution: cById.get(a.constitution_id)!,
-      termFreq: tf,
-      length: tokens.length || 1,
-    };
-  });
+let indexCache: CorpusIndex | null = null;
+let preloadPromise: Promise<void> | null = null;
+
+const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+// Build a fresh country-name boost list from the live constitutions array,
+// so any country mentioned in a question gets ranked higher.
+function buildBoosts(
+  cs: Array<BundledConstitution | Constitution>,
+): Array<{ pattern: RegExp; id: string }> {
+  const out: Array<{ pattern: RegExp; id: string }> = [];
+  for (const c of cs) {
+    if (!c.country) continue;
+    out.push({
+      pattern: new RegExp(`\\b${escapeRegex(c.country)}\\b`, 'i'),
+      id: c.id,
+    });
+  }
+  // Common nicknames that are unambiguous.
+  const aliases: Array<[RegExp, string]> = [
+    [/\b(united states|usa|u\.s\.|america|american)\b/i, 'us'],
+    [/\bbritain|british|uk\b/i, 'gb'],
+    [/\b(czech republic|czechia)\b/i, 'cz'],
+    [/\bholland\b/i, 'nl'],
+    [/\bburma\b/i, 'mm'],
+    [/\bivory coast\b/i, 'ci'],
+  ];
+  for (const [pattern, id] of aliases) out.push({ pattern, id });
+  return out;
+}
+
+function buildIndexFrom(
+  articleList: Array<BundledArticle | Article>,
+  constitutionList: Array<BundledConstitution | Constitution>,
+  source: 'bundled' | 'supabase',
+): CorpusIndex {
+  const cById = new Map(constitutionList.map((c) => [c.id, c]));
+  const entries: IndexEntry[] = articleList
+    .map((a) => {
+      const constitution = cById.get(a.constitution_id);
+      if (!constitution) return null;
+      const tokens = tokenize(`${a.title} ${a.content} ${a.chapter}`);
+      const tf = new Map<string, number>();
+      tokens.forEach((t) => tf.set(t, (tf.get(t) ?? 0) + 1));
+      return {
+        article: a,
+        constitution,
+        termFreq: tf,
+        length: tokens.length || 1,
+      };
+    })
+    .filter((e): e is IndexEntry => e !== null);
 
   const df = new Map<string, number>();
   entries.forEach((e) => {
     for (const t of e.termFreq.keys()) df.set(t, (df.get(t) ?? 0) + 1);
   });
-  const N = entries.length;
+  const N = entries.length || 1;
   const idf = new Map<string, number>();
   for (const [term, freq] of df) {
     idf.set(term, Math.log(1 + N / freq));
   }
 
-  indexCache = { entries, idf };
+  return { entries, idf, boosts: buildBoosts(constitutionList), source };
+}
+
+function buildIndex(): CorpusIndex {
+  if (indexCache) return indexCache;
+  // Synchronous fallback while preloadCorpus() is in flight.
+  indexCache = buildIndexFrom(bundledArticles, bundledConstitutions, 'bundled');
   return indexCache;
 }
 
-const COUNTRY_BOOSTS: Array<{ pattern: RegExp; id: string }> = [
-  { pattern: /\b(united states|usa|u\.s\.|america|american)\b/i, id: 'us' },
-  { pattern: /\bnigeria(n)?\b/i, id: 'ng' },
-  { pattern: /\bindia(n)?\b/i, id: 'in' },
-  { pattern: /\bgerman(y|an)?\b/i, id: 'de' },
-  { pattern: /\bsouth africa(n)?\b/i, id: 'za' },
-  { pattern: /\bbrazil(ian)?\b/i, id: 'br' },
-  { pattern: /\bjapan(ese)?\b/i, id: 'jp' },
-  { pattern: /\baustralia(n)?\b/i, id: 'au' },
-];
+/**
+ * Loads every constitution + article from Supabase (or returns immediately
+ * if already loaded). Call once at app start; subsequent calls are no-ops.
+ * Failures are non-fatal — the bundled corpus stays in place.
+ */
+export async function preloadCorpus(): Promise<void> {
+  if (preloadPromise) return preloadPromise;
+  preloadPromise = (async () => {
+    try {
+      const [allCons, allArticles] = await Promise.all([
+        fetchConstitutions(),
+        fetchAllArticles(),
+      ]);
+      if (allArticles.length === 0 || allCons.length === 0) return;
+      indexCache = buildIndexFrom(allArticles, allCons, 'supabase');
+      console.info(
+        `[ai] corpus loaded: ${allArticles.length} articles across ${allCons.length} countries (Supabase).`,
+      );
+    } catch (err) {
+      console.warn('[ai] corpus preload failed; using bundled fallback.', err);
+    }
+  })();
+  return preloadPromise;
+}
+
+export const corpusSize = (): number => buildIndex().entries.length;
 
 export function searchCorpus(query: string, k = 4): ScoredArticle[] {
-  const { entries, idf } = buildIndex();
+  const { entries, idf, boosts } = buildIndex();
   const qTokens = tokenize(query);
   if (qTokens.length === 0) return [];
 
-  const targetCountry = COUNTRY_BOOSTS.find((c) => c.pattern.test(query))?.id;
+  const targetCountry = boosts.find((c) => c.pattern.test(query))?.id;
 
   const scored: ScoredArticle[] = entries.map((e) => {
     let score = 0;
@@ -145,12 +218,9 @@ const COMPARE_TRIGGER = /\b(compare|vs|versus|difference|differ)\b/i;
 
 function compareAcrossCountries(query: string): CitedAnswer | null {
   if (!COMPARE_TRIGGER.test(query)) return null;
-  const mentioned = COUNTRY_BOOSTS.filter((c) => c.pattern.test(query)).map(
-    (c) => c.id,
-  );
+  const { entries, idf, boosts } = buildIndex();
+  const mentioned = boosts.filter((c) => c.pattern.test(query)).map((c) => c.id);
   if (mentioned.length < 2) return null;
-
-  const { entries, idf } = buildIndex();
   const qTokens = tokenize(query);
 
   const perCountry: ScoredArticle[] = [];
@@ -212,10 +282,13 @@ export function answer(query: string): CitedAnswer {
 
   const hits = searchCorpus(trimmed, 4);
   if (hits.length === 0) {
+    const { entries, source } = buildIndex();
+    const sizeNote =
+      source === 'supabase'
+        ? `My corpus indexes ${entries.length} articles across every country with available text.`
+        : `My corpus is still loading; only the offline bundle is ready right now.`;
     return {
-      reply: `I don't have a clearly matching passage in my indexed corpus for that question. The corpus currently covers: ${bundledConstitutions
-        .map((c) => `${c.flag} ${c.country}`)
-        .join(', ')}. Try asking about a specific right (e.g. "freedom of speech in Nigeria") or compare two countries.`,
+      reply: `I couldn't find a passage that clearly matches that question. ${sizeNote} Try rephrasing — e.g. mention the country by name ("freedom of expression in Kenya"), the right itself ("right to a fair trial"), or ask me to compare two countries.`,
       hits: [],
       confidence: 'low',
     };
@@ -262,9 +335,8 @@ export function answer(query: string): CitedAnswer {
  */
 function retrieveForRAG(query: string, k = 6): ScoredArticle[] {
   const top = searchCorpus(query, k);
-  const mentioned = COUNTRY_BOOSTS.filter((c) => c.pattern.test(query)).map(
-    (c) => c.id,
-  );
+  const { boosts } = buildIndex();
+  const mentioned = boosts.filter((c) => c.pattern.test(query)).map((c) => c.id);
   if (mentioned.length < 2) return top;
 
   // Search a deeper window so we can pull a country-specific best for each.

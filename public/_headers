@@ -1,0 +1,21 @@
+# Security headers — applied to every response from Netlify.
+# Helps Safe Browsing trust the site and protects against common attacks.
+
+/*
+  # HTTPS pinning — tells browsers to only ever load this site over HTTPS.
+  Strict-Transport-Security: max-age=31536000; includeSubDomains
+
+  # Mitigates MIME sniffing.
+  X-Content-Type-Options: nosniff
+
+  # Don't leak full referrer URLs to third parties.
+  Referrer-Policy: strict-origin-when-cross-origin
+
+  # Restrict what the page is allowed to do. Mic stays on for voice input.
+  Permissions-Policy: camera=(), microphone=(self), geolocation=(), interest-cohort=()
+
+  # Prevent embedding in iframes (clickjacking defence).
+  X-Frame-Options: DENY
+
+  # Discourages legacy XSS auditors from breaking modern apps.
+  X-XSS-Protection: 0

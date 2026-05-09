@@ -233,28 +233,46 @@ function parseConstitute(html) {
   let ord = 0;
 
   function flush() {
-    if (pendingHeading && pendingParas.length > 0) {
-      const heading = pendingHeading.replace(/\s+/g, ' ').trim();
-      const m = heading.match(
-        /^Article\s+([\d.IVXLCMivxlcm]+\w*)\s*[\-—.:]?\s*(.*)$/i,
-      );
-      const article_number = m ? `Article ${m[1]}` : heading;
-      const explicitTitle = m && m[2] && m[2].trim();
-      // Fallback title: first sentence of content, capped at 70 chars.
-      // Avoids the ugly "Article 1 — Article 1" rendering when the source
-      // has no descriptive heading.
-      const fallbackTitle = pendingParas[0]
-        ? pendingParas[0].split(/[.!?](?:\s|$)/)[0].slice(0, 70).trim()
-        : '';
-      const title = explicitTitle || fallbackTitle || article_number;
-      articles.push({
-        ord: ord++,
-        chapter: currentChapter || 'General Provisions',
-        article_number,
-        title,
-        content: pendingParas.join('\n\n'),
-      });
+    if (!pendingHeading) {
+      pendingParas = [];
+      return;
     }
+    if (pendingParas.length === 0) {
+      // Heading with no body content — must be a chapter / part / title divider.
+      currentChapter = pendingHeading.replace(/\s+/g, ' ').trim();
+      pendingHeading = null;
+      return;
+    }
+    const heading = pendingHeading.replace(/\s+/g, ' ').trim();
+    // Recognise common labels used across constitutions:
+    //   "Article 1", "Section 1", "Sec. 1", "§ 1", "Art. 1"
+    const m = heading.match(
+      /^(Article|Art\.?|Section|Sec\.?|§)\s*([\d.IVXLCMivxlcm]+\w*)\s*[\-—.:]?\s*(.*)$/i,
+    );
+    let article_number;
+    let explicitTitle = '';
+    if (m) {
+      const label = m[1].replace(/\.$/, '');
+      const canonical =
+        /^art/i.test(label) ? 'Article' :
+        /^sec/i.test(label) ? 'Section' :
+        '§';
+      article_number = `${canonical} ${m[2]}`;
+      explicitTitle = (m[3] || '').trim();
+    } else {
+      article_number = heading;
+    }
+    const fallbackTitle = pendingParas[0]
+      ? pendingParas[0].split(/[.!?](?:\s|$)/)[0].slice(0, 70).trim()
+      : '';
+    const title = explicitTitle || fallbackTitle || article_number;
+    articles.push({
+      ord: ord++,
+      chapter: currentChapter || 'General Provisions',
+      article_number,
+      title,
+      content: pendingParas.join('\n\n'),
+    });
     pendingHeading = null;
     pendingParas = [];
   }
@@ -276,20 +294,34 @@ function parseConstitute(html) {
       // don't descend into headings
       return;
     }
-    if (tag === 'h3') {
+    if (tag === 'h3' || tag === 'h4') {
       flush();
-      const text = (node.text || '').trim();
-      if (/^Article\b/i.test(text)) {
-        pendingHeading = text;
-      } else {
-        // chapter-level heading expressed as h3 (e.g., "CHAPTER I. ...")
-        currentChapter = text;
-      }
+      pendingHeading = (node.text || '').trim();
+      // flush() on the NEXT heading will promote this to a chapter if no
+      // body paragraphs follow, or emit it as an article if they do.
       return;
     }
-    if (tag === 'p' && classOf(node).includes('content')) {
-      const t = (node.text || '').trim();
-      if (t) pendingParas.push(t);
+    if (tag === 'p') {
+      const text = (node.text || '').trim();
+      if (!text) return;
+      // Bare-number paragraph (e.g., "1", "133", "II.") — Constitute uses
+      // these as section markers in many British-tradition constitutions
+      // (Nigeria, Pakistan, Kenya, Australia) instead of an h3 heading.
+      if (/^(\d{1,4}|[IVXLCDM]{1,8})\.?$/.test(text) && text.length <= 8) {
+        flush();
+        pendingHeading = `Section ${text.replace(/\.$/, '')}`;
+        return;
+      }
+      // Otherwise it's body text. We used to require class="content", but
+      // some constitutions emit body paragraphs without that class.
+      pendingParas.push(text);
+      return;
+    }
+    if (tag === 'li') {
+      // Items inside <ol>/<ul> are subsection clauses, e.g. "(1) The State
+      // shall…". Capture their text under the current article.
+      const text = (node.text || '').trim();
+      if (text) pendingParas.push(text);
       return;
     }
     if (node.childNodes) {
@@ -371,6 +403,7 @@ async function main() {
   let total = 0;
   let withConstitute = 0;
   let withWiki = 0;
+  let withProfileOnly = 0;
   let articlesWritten = 0;
   let failed = 0;
 
@@ -379,6 +412,14 @@ async function main() {
     const id = c.cca2.toLowerCase();
     const country = c.name.common;
     const region = mapRegion(c.region, c.subregion);
+
+    // Country metadata from REST Countries — written to every Supabase row
+    // so the app no longer depends on a runtime REST Countries fetch.
+    const capital = c.capital?.[0] || '';
+    const population = Number.isFinite(c.population) ? c.population : null;
+    const languages = c.languages ? Object.values(c.languages) : [];
+    const subregion = c.subregion || '';
+    const flagImage = c.flags?.svg || c.flags?.png || '';
 
     process.stdout.write(
       `[${String(total).padStart(3)}/${countries.length}] ${c.flag} ${country.padEnd(34)} `,
@@ -417,20 +458,22 @@ async function main() {
       if (wiki) summary = wiki.extract.slice(0, 480);
     }
 
-    // Upsert constitution row
+    // Upsert constitution row — now includes country metadata so Supabase is
+    // the single source of truth, no runtime REST Countries dependency.
     const constitutionRow = {
       id,
       country,
       country_code: c.cca2,
       flag: c.flag,
       region,
-      title: parsedArticles
-        ? `Constitution of ${country}`
-        : wiki
-          ? `Constitution of ${country}`
-          : `Constitution of ${country}`,
+      title: `Constitution of ${country}`,
       adopted,
       summary,
+      capital,
+      population,
+      languages,
+      subregion,
+      flag_image_url: flagImage,
     };
     const cErr = await upsertConstitution(constitutionRow);
     if (cErr) {
@@ -493,7 +536,41 @@ async function main() {
         console.log('✓ Wikipedia overview');
       }
     } else {
-      console.log('— (profile only)');
+      // No constitutional text from any source — write a synthetic country
+      // profile so the AI corpus has at least one indexed row for every
+      // country in the world, instead of "I don't have a passage" errors.
+      const factsLine =
+        [
+          capital && `Capital: ${capital}`,
+          population != null && `Population: ${population.toLocaleString('en-US')}`,
+          subregion && `Sub-region: ${subregion}`,
+          languages.length > 0 && `Official / national languages: ${languages.join(', ')}`,
+        ]
+          .filter(Boolean)
+          .join('. ');
+      const profile = {
+        id: `${id}-profile`,
+        constitution_id: id,
+        chapter: 'Country profile',
+        article_number: 'Profile',
+        title: `${country} — country profile`,
+        content:
+          `${country} is a country in ${region}` +
+          (subregion ? ` (${subregion}).` : '.') +
+          (factsLine ? ` ${factsLine}.` : '') +
+          `\n\nNo constitutional text is currently available for ${country} from the Constitute Project or Wikipedia. ` +
+          `For the latest constitutional information, see https://en.wikipedia.org/wiki/Constitution_of_${encodeURIComponent(country.replace(/\s+/g, '_'))}.`,
+        ord: 0,
+      };
+      const err = await replaceArticles(id, [profile]);
+      if (err) {
+        console.log(`profile ✗ (${err.message})`);
+        failed++;
+      } else {
+        withProfileOnly++;
+        articlesWritten += 1;
+        console.log('✓ profile only');
+      }
     }
   }
 
@@ -501,6 +578,7 @@ async function main() {
   console.log(`Total countries processed:        ${total}`);
   console.log(`Indexed via Constitute Project:   ${withConstitute}`);
   console.log(`Indexed via Wikipedia overview:   ${withWiki}`);
+  console.log(`Indexed via country profile only: ${withProfileOnly}`);
   console.log(`Total article rows written:       ${articlesWritten}`);
   console.log(`Failed:                           ${failed}`);
   console.log('='.repeat(64));

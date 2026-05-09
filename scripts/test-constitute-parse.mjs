@@ -33,21 +33,31 @@ let pendingParas = [];
 let ord = 0;
 
 function flush() {
-  if (pendingHeading && pendingParas.length > 0) {
-    const heading = pendingHeading.replace(/\s+/g, ' ').trim();
-    const m = heading.match(/^Article\s+([\d.IVXLCMivxlcm]+\w*)\s*[\-—.:]?\s*(.*)$/i);
-    const article_number = m ? `Article ${m[1]}` : heading;
-    const explicitTitle = m && m[2] && m[2].trim();
-    const fallbackTitle = pendingParas[0]
-      ? pendingParas[0].split(/[.!?](?:\s|$)/)[0].slice(0, 70).trim()
-      : '';
-    const title = explicitTitle || fallbackTitle || article_number;
-    articles.push({ ord: ord++, chapter: currentChapter || 'General Provisions', article_number, title, content: pendingParas.join('\n\n') });
+  if (!pendingHeading) { pendingParas = []; return; }
+  if (pendingParas.length === 0) {
+    currentChapter = pendingHeading.replace(/\s+/g, ' ').trim();
+    pendingHeading = null;
+    return;
   }
+  const heading = pendingHeading.replace(/\s+/g, ' ').trim();
+  const m = heading.match(/^(Article|Art\.?|Section|Sec\.?|§)\s*([\d.IVXLCMivxlcm]+\w*)\s*[\-—.:]?\s*(.*)$/i);
+  let article_number, explicitTitle = '';
+  if (m) {
+    const label = m[1].replace(/\.$/, '');
+    const canonical = /^art/i.test(label) ? 'Article' : /^sec/i.test(label) ? 'Section' : '§';
+    article_number = `${canonical} ${m[2]}`;
+    explicitTitle = (m[3] || '').trim();
+  } else {
+    article_number = heading;
+  }
+  const fallbackTitle = pendingParas[0]
+    ? pendingParas[0].split(/[.!?](?:\s|$)/)[0].slice(0, 70).trim()
+    : '';
+  const title = explicitTitle || fallbackTitle || article_number;
+  articles.push({ ord: ord++, chapter: currentChapter || 'General Provisions', article_number, title, content: pendingParas.join('\n\n') });
   pendingHeading = null;
   pendingParas = [];
 }
-function classOf(node) { return (node.attributes && node.attributes.class) || ''; }
 function walk(node) {
   if (!node) return;
   const tag = node.tagName ? node.tagName.toLowerCase() : '';
@@ -58,16 +68,25 @@ function walk(node) {
     if (/^preamble$/i.test(text)) pendingHeading = 'Preamble';
     return;
   }
-  if (tag === 'h3') {
+  if (tag === 'h3' || tag === 'h4') {
     flush();
-    const text = (node.text || '').trim();
-    if (/^Article\b/i.test(text)) pendingHeading = text;
-    else currentChapter = text;
+    pendingHeading = (node.text || '').trim();
     return;
   }
-  if (tag === 'p' && classOf(node).includes('content')) {
-    const t = (node.text || '').trim();
-    if (t) pendingParas.push(t);
+  if (tag === 'p') {
+    const text = (node.text || '').trim();
+    if (!text) return;
+    if (/^(\d{1,4}|[IVXLCDM]{1,8})\.?$/.test(text) && text.length <= 8) {
+      flush();
+      pendingHeading = `Section ${text.replace(/\.$/, '')}`;
+      return;
+    }
+    pendingParas.push(text);
+    return;
+  }
+  if (tag === 'li') {
+    const text = (node.text || '').trim();
+    if (text) pendingParas.push(text);
     return;
   }
   if (node.childNodes) for (const ch of node.childNodes) walk(ch);

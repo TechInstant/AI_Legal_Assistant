@@ -252,23 +252,11 @@ export const Explorer: React.FC = () => {
             </div>
           </div>
 
-          {/* REST Countries status indicator */}
-          {countryStatus.state === 'loading' && (
-            <p className="text-[11px] text-slate dark:text-mist flex items-center gap-2">
-              <Loader2 className="w-3 h-3 animate-spin" />
-              Loading the global country catalogue…
-            </p>
-          )}
-          {countryStatus.state === 'ok' && (
-            <p className="text-[11px] text-sage-500">
-              ● {countryStatus.count} countries loaded from REST Countries
-              {countryStatus.source === 'cache' ? ' (cached)' : ''}
-            </p>
-          )}
+          {/* Only surface the catalogue state when something is wrong;
+              the count above already tells users how much loaded. */}
           {countryStatus.state === 'error' && (
             <p className="text-[11px] text-rose-500">
-              ● Couldn't reach REST Countries — showing only the indexed
-              countries. ({countryStatus.message})
+              ● Couldn't load the full country catalogue — showing what we have indexed.
             </p>
           )}
         </Card>
