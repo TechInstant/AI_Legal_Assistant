@@ -133,10 +133,52 @@ const mapRegion = (region, subregion) => {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+// Retry on transient network failures (TypeError: fetch failed, ECONNRESET,
+// timeouts). Backs off 1.5s → 4s → 9s before giving up. HTTP error
+// statuses (4xx/5xx) are NOT retried — those are passed back to the caller.
+async function fetchWithRetry(url, options = {}, attempts = 3) {
+  let lastErr;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      return await fetch(url, options);
+    } catch (err) {
+      lastErr = err;
+      if (i < attempts - 1) {
+        const wait = [1500, 4000, 9000][i] ?? 9000;
+        await sleep(wait);
+      }
+    }
+  }
+  throw lastErr;
+}
+
+// Wraps Supabase calls. supabase-js surfaces network errors via the result
+// object's .error.message rather than throwing, so we have to inspect it.
+async function supabaseWithRetry(fn, attempts = 3) {
+  let lastErr;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      const result = await fn();
+      const msg = result?.error?.message || '';
+      const isNetwork =
+        /fetch failed|network|timeout|ECONNRESET|ETIMEDOUT|ENOTFOUND/i.test(msg);
+      if (result?.error && isNetwork && i < attempts - 1) {
+        await sleep([1500, 4000, 9000][i] ?? 9000);
+        continue;
+      }
+      return result;
+    } catch (err) {
+      lastErr = err;
+      if (i < attempts - 1) await sleep([1500, 4000, 9000][i] ?? 9000);
+    }
+  }
+  throw lastErr ?? new Error('supabaseWithRetry exhausted');
+}
+
 async function fetchCountries() {
   const fields =
     'name,cca2,cca3,region,subregion,flag,flags,capital,population,languages';
-  const res = await fetch(
+  const res = await fetchWithRetry(
     `https://restcountries.com/v3.1/all?fields=${fields}`,
   );
   if (!res.ok) throw new Error(`REST Countries ${res.status}`);
