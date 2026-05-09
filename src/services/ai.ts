@@ -32,6 +32,14 @@ export interface CitedAnswer {
   reply: string;
   hits: ScoredArticle[];
   confidence: 'high' | 'medium' | 'low';
+  /**
+   * Set when the answer is a graceful degradation rather than the ideal
+   * path — UI surfaces a small badge so the user understands what they're
+   * looking at.
+   *   llm-unavailable: OpenRouter rate-limited / down → local quotation
+   *   profile-only:    only the synthetic country profile matched
+   */
+  degraded?: 'llm-unavailable' | 'profile-only';
 }
 
 export interface ScoredArticle {
@@ -171,6 +179,18 @@ export async function preloadCorpus(): Promise<void> {
 }
 
 export const corpusSize = (): number => buildIndex().entries.length;
+
+/** True once the Supabase corpus has been loaded into the index. */
+export const isCorpusReady = (): boolean => indexCache?.source === 'supabase';
+
+/** True if a preload is in flight and we're still on the bundled fallback. */
+export const isCorpusLoading = (): boolean =>
+  !!preloadPromise && !isCorpusReady();
+
+// Synthetic profile rows are written by the seed for countries with no
+// constitutional text. Their ids look like "ad-profile", "tv-profile".
+const isProfileOnlyArticle = (a: BundledArticle | Article): boolean =>
+  typeof a.id === 'string' && a.id.endsWith('-profile');
 
 export function searchCorpus(query: string, k = 4): ScoredArticle[] {
   const { entries, idf, boosts } = buildIndex();
@@ -398,6 +418,24 @@ export const answerSmart = async (
     return empty;
   }
 
+  // Wait for the full Supabase corpus before searching, so the user never
+  // gets a "29 bundled countries only" answer when the real library is
+  // moments away. After the first query this is instant.
+  if (preloadPromise && !isCorpusReady()) {
+    await preloadPromise.catch(() => {
+      /* preload errors are non-fatal — we'll fall back to bundled */
+    });
+  }
+
+  // Detect the profile-only case once and reuse for both code paths.
+  const tagProfileOnly = (a: CitedAnswer): CitedAnswer => {
+    const top = a.hits[0];
+    if (top && isProfileOnlyArticle(top.article) && a.hits.length === 1) {
+      return { ...a, degraded: 'profile-only' };
+    }
+    return a;
+  };
+
   if (isOpenRouterConfigured()) {
     const sources = retrieveForRAG(trimmed, 6);
     onSources?.(sources);
@@ -405,7 +443,7 @@ export const answerSmart = async (
     if (sources.length === 0) {
       const fallback = answer(trimmed);
       onToken?.(fallback.reply);
-      return fallback;
+      return tagProfileOnly(fallback);
     }
 
     let accumulated = '';
@@ -419,11 +457,11 @@ export const answerSmart = async (
           onToken?.(t);
         },
       });
-      return {
+      return tagProfileOnly({
         reply: accumulated.trim() || answer(trimmed).reply,
         hits: sources,
         confidence: confidenceFromScore(sources[0]?.score ?? 0),
-      };
+      });
     } catch (err) {
       // If aborted, surface as-is so the caller can show partial output.
       if ((err as Error).name === 'AbortError') {
@@ -436,7 +474,7 @@ export const answerSmart = async (
       console.warn('[ai] RAG call failed; falling back to local.', err);
       const fallback = answer(trimmed);
       onToken?.(fallback.reply);
-      return fallback;
+      return tagProfileOnly({ ...fallback, degraded: 'llm-unavailable' });
     }
   }
 
@@ -444,5 +482,5 @@ export const answerSmart = async (
   const local = answer(trimmed);
   onSources?.(local.hits);
   onToken?.(local.reply);
-  return local;
+  return tagProfileOnly(local);
 };

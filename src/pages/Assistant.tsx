@@ -26,6 +26,7 @@ type Message = {
   plain?: string; // text suitable for TTS (no markdown, no source-list lines)
   citations?: CitedAnswer['hits'];
   confidence?: CitedAnswer['confidence'];
+  degraded?: CitedAnswer['degraded'];
 };
 
 const SUGGESTIONS = [
@@ -39,6 +40,13 @@ const confidenceStyles: Record<NonNullable<Message['confidence']>, string> = {
   high: 'text-sage-500 bg-sage-500/10 border-sage-500/30',
   medium: 'text-honey-500 bg-honey-500/10 border-honey-500/30',
   low: 'text-rose-500 bg-rose-500/10 border-rose-500/30',
+};
+
+const degradedNotice: Record<NonNullable<Message['degraded']>, string> = {
+  'llm-unavailable':
+    'AI generation is temporarily unavailable (rate-limited). Showing the closest matching passage from the corpus instead.',
+  'profile-only':
+    'No constitutional text is yet indexed for this country — only a basic country profile. The Wikipedia link in the source has fuller information.',
 };
 
 const renderMarkdownish = (text: string) =>
@@ -204,6 +212,7 @@ export const Assistant: React.FC = () => {
                 plain: cleanForSpeech(result.reply),
                 citations: result.hits,
                 confidence: result.confidence,
+                degraded: result.degraded,
               }
             : m,
         ),
@@ -349,6 +358,18 @@ export const Assistant: React.FC = () => {
                   <div className="space-y-1">{renderMarkdownish(msg.content)}</div>
                 ) : (
                   <p>{msg.content}</p>
+                )}
+
+                {msg.role === 'assistant' && msg.degraded && (
+                  <div
+                    className={`text-[11px] leading-snug px-3 py-2 rounded-lg border ${
+                      msg.degraded === 'llm-unavailable'
+                        ? 'border-honey-500/40 bg-honey-500/10 text-honey-700 dark:text-honey-100'
+                        : 'border-slate/30 bg-slate/5 text-slate dark:text-mist'
+                    }`}
+                  >
+                    {degradedNotice[msg.degraded]}
+                  </div>
                 )}
 
                 {msg.role === 'assistant' && (

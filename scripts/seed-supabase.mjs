@@ -191,7 +191,7 @@ let constituteIndex = null;
 
 async function loadConstituteIndex() {
   if (constituteIndex) return constituteIndex;
-  const res = await fetch(`${CONSTITUTE_BASE}/constitutions?lang=en`, {
+  const res = await fetchWithRetry(`${CONSTITUTE_BASE}/constitutions?lang=en`, {
     headers: HEADERS,
   });
   if (!res.ok) throw new Error(`Constitute index HTTP ${res.status}`);
@@ -253,7 +253,7 @@ function matchToConstitute(restCountry, index) {
 }
 
 async function fetchConstituteHtml(consId) {
-  const res = await fetch(
+  const res = await fetchWithRetry(
     `${CONSTITUTE_BASE}/html?cons_id=${encodeURIComponent(consId)}&lang=en`,
     { headers: HEADERS },
   );
@@ -386,7 +386,7 @@ async function fetchWikipediaSummary(countryName) {
   ];
   for (const title of variants) {
     try {
-      const res = await fetch(
+      const res = await fetchWithRetry(
         `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title.replace(/\s+/g, '_'))}`,
         { headers: HEADERS },
       );
@@ -409,7 +409,9 @@ async function fetchWikipediaSummary(countryName) {
 // ---------- Supabase write helpers ----------
 
 async function upsertConstitution(row) {
-  const { error } = await sb.from('constitutions').upsert(row);
+  const { error } = await supabaseWithRetry(() =>
+    sb.from('constitutions').upsert(row),
+  );
   return error;
 }
 
@@ -417,15 +419,19 @@ async function replaceArticles(constitutionId, rows) {
   // Upsert all new rows in chunks…
   for (let i = 0; i < rows.length; i += 50) {
     const chunk = rows.slice(i, i + 50);
-    const { error } = await sb.from('articles').upsert(chunk);
+    const { error } = await supabaseWithRetry(() =>
+      sb.from('articles').upsert(chunk),
+    );
     if (error) return error;
   }
   // …then drop any leftover rows from a previous, larger revision.
-  const { error: dErr } = await sb
-    .from('articles')
-    .delete()
-    .eq('constitution_id', constitutionId)
-    .gte('ord', rows.length);
+  const { error: dErr } = await supabaseWithRetry(() =>
+    sb
+      .from('articles')
+      .delete()
+      .eq('constitution_id', constitutionId)
+      .gte('ord', rows.length),
+  );
   return dErr || null;
 }
 
@@ -448,15 +454,20 @@ async function main() {
   let withProfileOnly = 0;
   let articlesWritten = 0;
   let failed = 0;
+  // Countries whose Constitute fetch failed transiently OR whose Supabase
+  // write returned an error. We retry these once more after the main pass
+  // — gives flaky networks time to recover.
+  const needsRetry = [];
 
-  for (const c of countries) {
-    total++;
+  // Returns { status: 'constitute' | 'wiki' | 'profile' | 'failed',
+  //           hadNetworkError: boolean,
+  //           constituteAvailable: boolean,
+  //           articlesAdded: number }
+  async function processCountry(c, displayPrefix) {
     const id = c.cca2.toLowerCase();
     const country = c.name.common;
     const region = mapRegion(c.region, c.subregion);
 
-    // Country metadata from REST Countries — written to every Supabase row
-    // so the app no longer depends on a runtime REST Countries fetch.
     const capital = c.capital?.[0] || '';
     const population = Number.isFinite(c.population) ? c.population : null;
     const languages = c.languages ? Object.values(c.languages) : [];
@@ -464,15 +475,15 @@ async function main() {
     const flagImage = c.flags?.svg || c.flags?.png || '';
 
     process.stdout.write(
-      `[${String(total).padStart(3)}/${countries.length}] ${c.flag} ${country.padEnd(34)} `,
+      `${displayPrefix} ${c.flag} ${country.padEnd(34)} `,
     );
 
     const cMatch = matchToConstitute(c, cIndex);
     let parsedArticles = null;
     let adopted = '';
     let summary = '';
+    let hadNetworkError = false;
 
-    // 1) Constitute (preferred)
     if (cMatch) {
       try {
         const html = await fetchConstituteHtml(cMatch.id);
@@ -482,9 +493,9 @@ async function main() {
           if (parsedArticles.length === 0) parsedArticles = null;
         }
       } catch (err) {
+        hadNetworkError = true;
         process.stdout.write(`(constitute err: ${err.message}) `);
       }
-
       if (parsedArticles) {
         adopted = String(cMatch.year_revised || cMatch.year_enacted || '');
         const firstPara = parsedArticles[0]?.content?.slice(0, 380) || '';
@@ -492,16 +503,18 @@ async function main() {
       }
     }
 
-    // 2) Wikipedia fallback
     let wiki = null;
     if (!parsedArticles) {
-      wiki = await fetchWikipediaSummary(country);
-      await sleep(DELAY_MS);
-      if (wiki) summary = wiki.extract.slice(0, 480);
+      try {
+        wiki = await fetchWikipediaSummary(country);
+        await sleep(DELAY_MS);
+        if (wiki) summary = wiki.extract.slice(0, 480);
+      } catch (err) {
+        hadNetworkError = true;
+        process.stdout.write(`(wiki err: ${err.message}) `);
+      }
     }
 
-    // Upsert constitution row — now includes country metadata so Supabase is
-    // the single source of truth, no runtime REST Countries dependency.
     const constitutionRow = {
       id,
       country,
@@ -520,13 +533,7 @@ async function main() {
     const cErr = await upsertConstitution(constitutionRow);
     if (cErr) {
       console.log(`✗ ${cErr.message}`);
-      // RLS on the very first row means the key can't write at all — bail
-      // out instead of grinding through 250 doomed inserts.
-      if (
-        cErr.message &&
-        cErr.message.includes('row-level security') &&
-        total <= 3
-      ) {
+      if (cErr.message?.includes('row-level security') && total <= 3) {
         console.error('\n  Supabase rejected the write under RLS.');
         console.error('  The script needs the service_role (secret) key.');
         console.error(
@@ -534,8 +541,8 @@ async function main() {
         );
         process.exit(2);
       }
-      failed++;
-      continue;
+      const isNetwork = /fetch failed|network|timeout/i.test(cErr.message || '');
+      return { status: 'failed', hadNetworkError: isNetwork, constituteAvailable: !!cMatch, articlesAdded: 0 };
     }
 
     // Write articles
@@ -552,13 +559,14 @@ async function main() {
       const err = await replaceArticles(id, rows);
       if (err) {
         console.log(`✗ articles: ${err.message}`);
-        failed++;
-      } else {
-        withConstitute++;
-        articlesWritten += rows.length;
-        console.log(`✓ Constitute (${rows.length} articles)`);
+        const isNetwork = /fetch failed|network|timeout/i.test(err.message || '');
+        return { status: 'failed', hadNetworkError: isNetwork, constituteAvailable: true, articlesAdded: 0 };
       }
-    } else if (wiki) {
+      console.log(`✓ Constitute (${rows.length} articles)`);
+      return { status: 'constitute', hadNetworkError: false, constituteAvailable: true, articlesAdded: rows.length };
+    }
+
+    if (wiki) {
       const overview = {
         id: `${id}-overview`,
         constitution_id: id,
@@ -571,48 +579,103 @@ async function main() {
       const err = await replaceArticles(id, [overview]);
       if (err) {
         console.log(`profile ✓ article ✗ (${err.message})`);
-        failed++;
-      } else {
-        withWiki++;
-        articlesWritten += 1;
-        console.log('✓ Wikipedia overview');
+        const isNetwork = /fetch failed|network|timeout/i.test(err.message || '');
+        return { status: 'failed', hadNetworkError: isNetwork, constituteAvailable: !!cMatch, articlesAdded: 0 };
       }
-    } else {
-      // No constitutional text from any source — write a synthetic country
-      // profile so the AI corpus has at least one indexed row for every
-      // country in the world, instead of "I don't have a passage" errors.
-      const factsLine =
-        [
-          capital && `Capital: ${capital}`,
-          population != null && `Population: ${population.toLocaleString('en-US')}`,
-          subregion && `Sub-region: ${subregion}`,
-          languages.length > 0 && `Official / national languages: ${languages.join(', ')}`,
-        ]
-          .filter(Boolean)
-          .join('. ');
-      const profile = {
-        id: `${id}-profile`,
-        constitution_id: id,
-        chapter: 'Country profile',
-        article_number: 'Profile',
-        title: `${country} — country profile`,
-        content:
-          `${country} is a country in ${region}` +
-          (subregion ? ` (${subregion}).` : '.') +
-          (factsLine ? ` ${factsLine}.` : '') +
-          `\n\nNo constitutional text is currently available for ${country} from the Constitute Project or Wikipedia. ` +
-          `For the latest constitutional information, see https://en.wikipedia.org/wiki/Constitution_of_${encodeURIComponent(country.replace(/\s+/g, '_'))}.`,
-        ord: 0,
-      };
-      const err = await replaceArticles(id, [profile]);
-      if (err) {
-        console.log(`profile ✗ (${err.message})`);
-        failed++;
-      } else {
-        withProfileOnly++;
-        articlesWritten += 1;
-        console.log('✓ profile only');
-      }
+      console.log('✓ Wikipedia overview');
+      return { status: 'wiki', hadNetworkError, constituteAvailable: !!cMatch, articlesAdded: 1 };
+    }
+
+    // Synthetic country profile so the AI corpus has at least one row for
+    // every country in the world.
+    const factsLine =
+      [
+        capital && `Capital: ${capital}`,
+        population != null && `Population: ${population.toLocaleString('en-US')}`,
+        subregion && `Sub-region: ${subregion}`,
+        languages.length > 0 && `Official / national languages: ${languages.join(', ')}`,
+      ]
+        .filter(Boolean)
+        .join('. ');
+    const profile = {
+      id: `${id}-profile`,
+      constitution_id: id,
+      chapter: 'Country profile',
+      article_number: 'Profile',
+      title: `${country} — country profile`,
+      content:
+        `${country} is a country in ${region}` +
+        (subregion ? ` (${subregion}).` : '.') +
+        (factsLine ? ` ${factsLine}.` : '') +
+        `\n\nNo constitutional text is currently available for ${country} from the Constitute Project or Wikipedia. ` +
+        `For the latest constitutional information, see https://en.wikipedia.org/wiki/Constitution_of_${encodeURIComponent(country.replace(/\s+/g, '_'))}.`,
+      ord: 0,
+    };
+    const err = await replaceArticles(id, [profile]);
+    if (err) {
+      console.log(`profile ✗ (${err.message})`);
+      const isNetwork = /fetch failed|network|timeout/i.test(err.message || '');
+      return { status: 'failed', hadNetworkError: isNetwork, constituteAvailable: !!cMatch, articlesAdded: 0 };
+    }
+    console.log('✓ profile only');
+    return { status: 'profile', hadNetworkError, constituteAvailable: !!cMatch, articlesAdded: 1 };
+  }
+
+  // Per-country first-pass status, so retry adjustments are exact.
+  const firstStatus = new Map();
+  const firstArticles = new Map();
+
+  function applyDelta(status, articlesAdded, sign) {
+    if (status === 'constitute') {
+      withConstitute += sign;
+      articlesWritten += sign * articlesAdded;
+    } else if (status === 'wiki') {
+      withWiki += sign;
+      articlesWritten += sign * articlesAdded;
+    } else if (status === 'profile') {
+      withProfileOnly += sign;
+      articlesWritten += sign * articlesAdded;
+    } else if (status === 'failed') {
+      failed += sign;
+    }
+  }
+
+  // -------- First pass --------
+  for (const c of countries) {
+    total++;
+    const prefix = `[${String(total).padStart(3)}/${countries.length}]`;
+    const r = await processCountry(c, prefix);
+    applyDelta(r.status, r.articlesAdded, +1);
+    firstStatus.set(c.cca2, r.status);
+    firstArticles.set(c.cca2, r.articlesAdded);
+    // Queue for retry: hard failures, OR Constitute matches that downgraded
+    // to wiki/profile because of a network error during the HTML fetch.
+    if (
+      r.status === 'failed' ||
+      (r.constituteAvailable && r.hadNetworkError && r.status !== 'constitute')
+    ) {
+      needsRetry.push(c);
+    }
+  }
+
+  // -------- Second pass: retry transient failures --------
+  if (needsRetry.length > 0) {
+    console.log(
+      `\n${'─'.repeat(64)}\nRetrying ${needsRetry.length} countries that hit transient errors…\n${'─'.repeat(64)}`,
+    );
+    await sleep(5000); // let the network breathe
+    for (let i = 0; i < needsRetry.length; i++) {
+      const c = needsRetry[i];
+      const prefix = `[retry ${String(i + 1).padStart(2)}/${needsRetry.length}]`;
+      const r = await processCountry(c, prefix);
+      // Roll back the first-pass counts for this country, then apply the
+      // retry's outcome. Net effect: counters reflect the BEST result.
+      const oldStatus = firstStatus.get(c.cca2);
+      const oldArticles = firstArticles.get(c.cca2) || 0;
+      applyDelta(oldStatus, oldArticles, -1);
+      applyDelta(r.status, r.articlesAdded, +1);
+      firstStatus.set(c.cca2, r.status);
+      firstArticles.set(c.cca2, r.articlesAdded);
     }
   }
 
