@@ -70,7 +70,7 @@ export const Login: React.FC = () => {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full bg-white dark:bg-world-navy/60 border border-brand-slate/30 rounded-xl py-3 pl-4 pr-12 outline-none focus:border-world-ocean transition-colors"
-                placeholder="••••••••"
+                placeholder="*************"
               />
               <button
                 type="button"

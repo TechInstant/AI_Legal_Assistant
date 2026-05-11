@@ -4,7 +4,11 @@
 import type { ScoredArticle } from './ai';
 
 const API_URL = 'https://openrouter.ai/api/v1/chat/completions';
-const DEFAULT_MODEL = 'meta-llama/llama-3.3-70b-instruct:free';
+// Currently-live free models (check openrouter.ai/models?max_price=0 for fresh list):
+//   google/gemma-4-31b-it:free                       — Google Gemma 4, 31B, instruction-tuned
+//   nvidia/nemotron-3-super-120b-a12b:free           — NVIDIA Nemotron, 120B
+//   meta-llama/llama-3.3-70b-instruct:free           — Llama 3.3 (often rate-limited)
+const DEFAULT_MODEL = 'google/gemma-4-31b-it:free';
 
 const apiKey = import.meta.env.VITE_OPENROUTER_API_KEY as string | undefined;
 const model =

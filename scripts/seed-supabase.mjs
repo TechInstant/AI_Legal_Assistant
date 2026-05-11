@@ -265,6 +265,18 @@ async function fetchConstituteHtml(consId) {
 // Walks the Constitute HTML in document order and groups paragraphs under
 // their nearest preceding heading. <h2> sets the chapter; <h3> matching
 // /^Article\s+/ starts a new article; other <h3>s update the chapter.
+// Snap a string to <=70 chars at a word boundary, append ellipsis if cut.
+// Avoids ugly mid-word truncation like "shall have binding for" → "shall have binding force".
+function makeFallbackTitle(text) {
+  if (!text) return '';
+  const firstSentence = text.split(/[.!?](?:\s|$)/)[0].trim();
+  if (firstSentence.length <= 70) return firstSentence;
+  const cut = firstSentence.slice(0, 67);
+  const lastSpace = cut.lastIndexOf(' ');
+  const trimmed = lastSpace > 30 ? cut.slice(0, lastSpace) : cut;
+  return trimmed.trim() + '…';
+}
+
 function parseConstitute(html) {
   const root = parseHtml(html);
 
@@ -304,9 +316,7 @@ function parseConstitute(html) {
     } else {
       article_number = heading;
     }
-    const fallbackTitle = pendingParas[0]
-      ? pendingParas[0].split(/[.!?](?:\s|$)/)[0].slice(0, 70).trim()
-      : '';
+    const fallbackTitle = makeFallbackTitle(pendingParas[0]);
     const title = explicitTitle || fallbackTitle || article_number;
     articles.push({
       ord: ord++,

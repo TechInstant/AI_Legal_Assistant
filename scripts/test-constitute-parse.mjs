@@ -50,9 +50,13 @@ function flush() {
   } else {
     article_number = heading;
   }
-  const fallbackTitle = pendingParas[0]
-    ? pendingParas[0].split(/[.!?](?:\s|$)/)[0].slice(0, 70).trim()
-    : '';
+  const firstSent = pendingParas[0] ? pendingParas[0].split(/[.!?](?:\s|$)/)[0].trim() : '';
+  let fallbackTitle = firstSent;
+  if (firstSent.length > 70) {
+    const cut = firstSent.slice(0, 67);
+    const lastSpace = cut.lastIndexOf(' ');
+    fallbackTitle = (lastSpace > 30 ? cut.slice(0, lastSpace) : cut).trim() + '…';
+  }
   const title = explicitTitle || fallbackTitle || article_number;
   articles.push({ ord: ord++, chapter: currentChapter || 'General Provisions', article_number, title, content: pendingParas.join('\n\n') });
   pendingHeading = null;
