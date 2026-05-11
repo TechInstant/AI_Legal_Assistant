@@ -88,6 +88,39 @@ function walk(node) {
     pendingParas.push(text);
     return;
   }
+  if ((tag === 'ol' || tag === 'ul') && pendingHeading) {
+    const parentHeading = pendingHeading;
+    flush();
+    const liChildren = (node.childNodes || []).filter(
+      (ch) => ch.tagName?.toLowerCase() === 'li',
+    );
+    let idx = 0;
+    const pm = parentHeading.match(/^(Article|Art\.?|Section|Sec\.?|§)\s*([\d.IVXLCMivxlcm]+\w*)/i);
+    const baseLabel = pm ? (/^art/i.test(pm[1]) ? 'Article' : /^sec/i.test(pm[1]) ? 'Section' : '§') : null;
+    const baseNum = pm ? pm[2] : null;
+    for (const li of liChildren) {
+      idx++;
+      const style = li.attributes?.style || '';
+      const styleMatch = style.match(/list-style-type:\s*['"]([^'"]+)['"]/);
+      const label = styleMatch?.[1]?.trim() || String(idx);
+      const liText = (li.text || '').trim();
+      if (!liText) continue;
+      const article_number = baseLabel && baseNum
+        ? `${baseLabel} ${baseNum}.${label}`
+        : `${parentHeading} (${label})`;
+      const firstSent = liText.split(/[.!?](?:\s|$)/)[0].trim();
+      let title = firstSent;
+      if (firstSent.length > 70) {
+        const cut = firstSent.slice(0, 67);
+        const lastSpace = cut.lastIndexOf(' ');
+        title = (lastSpace > 30 ? cut.slice(0, lastSpace) : cut).trim() + '…';
+      }
+      articles.push({ ord: ord++, chapter: currentChapter || 'General Provisions', article_number, title: title || article_number, content: liText });
+    }
+    pendingHeading = null;
+    pendingParas = [];
+    return;
+  }
   if (tag === 'li') {
     const text = (node.text || '').trim();
     if (text) pendingParas.push(text);

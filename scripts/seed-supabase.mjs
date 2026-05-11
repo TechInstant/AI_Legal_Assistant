@@ -369,9 +369,54 @@ function parseConstitute(html) {
       pendingParas.push(text);
       return;
     }
+    if ((tag === 'ol' || tag === 'ul') && pendingHeading) {
+      // Numbered lists inside an article typically enumerate distinct rights
+      // (e.g. Mongolia's Article 16 lists 18 separate freedoms). Splitting
+      // each <li> into its own article row gives the TF-IDF retriever a
+      // tight, focused passage to match "freedom of speech in Mongolia"
+      // against, instead of one 360-word lump where every keyword is diluted.
+      const parentHeading = pendingHeading;
+      flush(); // commit whatever intro text preceded the list
+      const liChildren = (node.childNodes || []).filter(
+        (ch) => ch.tagName?.toLowerCase() === 'li',
+      );
+      let idx = 0;
+      const parentMatch = parentHeading.match(
+        /^(Article|Art\.?|Section|Sec\.?|§)\s*([\d.IVXLCMivxlcm]+\w*)/i,
+      );
+      const baseLabel = parentMatch
+        ? (/^art/i.test(parentMatch[1])
+            ? 'Article'
+            : /^sec/i.test(parentMatch[1])
+              ? 'Section'
+              : '§')
+        : null;
+      const baseNum = parentMatch ? parentMatch[2] : null;
+      for (const li of liChildren) {
+        idx++;
+        const style = li.attributes?.style || '';
+        const styleMatch = style.match(/list-style-type:\s*['"]([^'"]+)['"]/);
+        const label = styleMatch?.[1]?.trim() || String(idx);
+        const liText = (li.text || '').trim();
+        if (!liText) continue;
+        const article_number = baseLabel && baseNum
+          ? `${baseLabel} ${baseNum}.${label}`
+          : `${parentHeading} (${label})`;
+        articles.push({
+          ord: ord++,
+          chapter: currentChapter || 'General Provisions',
+          article_number,
+          title: makeFallbackTitle(liText) || article_number,
+          content: liText,
+        });
+      }
+      pendingHeading = null;
+      pendingParas = [];
+      return;
+    }
     if (tag === 'li') {
-      // Items inside <ol>/<ul> are subsection clauses, e.g. "(1) The State
-      // shall…". Capture their text under the current article.
+      // Stand-alone <li> outside a numbered list — append text to current
+      // article rather than splitting.
       const text = (node.text || '').trim();
       if (text) pendingParas.push(text);
       return;
