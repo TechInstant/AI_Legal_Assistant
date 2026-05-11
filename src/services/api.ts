@@ -111,7 +111,8 @@ export const fetchArticles = async (
     const { data, error } = await supabase
       .from('articles')
       .select('*')
-      .eq('constitution_id', constitutionId);
+      .eq('constitution_id', constitutionId)
+      .order('ord', { ascending: true, nullsFirst: false });
     if (error) throw error;
     if (!data || data.length === 0) return bundled;
     return data as Article[];
@@ -124,7 +125,11 @@ export const fetchArticles = async (
 export const fetchAllArticles = async (): Promise<Article[]> => {
   if (isPlaceholderEnv) return bundledArticles;
   try {
-    const { data, error } = await supabase.from('articles').select('*');
+    const { data, error } = await supabase
+      .from('articles')
+      .select('*')
+      .order('constitution_id', { ascending: true })
+      .order('ord', { ascending: true, nullsFirst: false });
     if (error) throw error;
     if (!data || data.length === 0) return bundledArticles;
     return data as Article[];

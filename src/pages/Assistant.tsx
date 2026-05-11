@@ -44,7 +44,7 @@ const confidenceStyles: Record<NonNullable<Message['confidence']>, string> = {
 
 const degradedNotice: Record<NonNullable<Message['degraded']>, string> = {
   'llm-unavailable':
-    'AI generation is currently unavailable (model rate-limited or deprecated). Showing the closest matching passage from the corpus instead — set VITE_OPENROUTER_MODEL to a fresh free model from openrouter.ai/models to restore AI answers.',
+    'AI generation is temporarily unavailable. Showing the closest matching passage from the indexed corpus instead.',
   'profile-only':
     'No constitutional text is yet indexed for this country — only a basic country profile. The Wikipedia link in the source has fuller information.',
 };
