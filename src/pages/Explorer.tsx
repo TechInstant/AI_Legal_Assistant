@@ -9,12 +9,7 @@ import {
   Globe,
   ChevronRight,
 } from 'lucide-react';
-import {
-  fetchArticles,
-  fetchConstitutions,
-  type Article,
-  type Constitution,
-} from '../services/api';
+import { type Article, type Constitution } from '../services/api';
 import { regionLabel, regionColorClass, type Region } from '../data/constitutions';
 import { ContinentSelector } from '../components/ContinentSelector';
 import { CountryDropdown } from '../components/CountryDropdown';
@@ -24,6 +19,7 @@ import {
 } from '../services/countries';
 import { BookmarkButton } from '../components/BookmarkButton';
 import { useTrackVisit } from '../lib/useBookmarks';
+import { useData } from '../context/DataContext';
 
 const ListenButton: React.FC<{ text: string }> = ({ text }) => {
   const [playing, setPlaying] = useState(false);
@@ -146,14 +142,18 @@ export const Explorer: React.FC = () => {
   // reading" strip). No-op when constitutionId is undefined.
   useTrackVisit(constitutionId);
 
-  const [constitutions, setConstitutions] = useState<Constitution[]>([]);
+  const { constitutions, constitutionsLoading, getArticles } = useData();
   const [articles, setArticles] = useState<Article[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [articlesLoading, setArticlesLoading] = useState(false);
   const [continent, setContinent] = useState<Region | 'all'>('all');
   const [activeArticleId, setActiveArticleId] = useState<string | null>(null);
   const [countryStatus, setCountryStatus] = useState<CountriesStatus>({
     state: 'idle',
   });
+
+  // Loading is true while the global constitution list is still loading, or
+  // while we're switching country pages and the article list is in flight.
+  const loading = constitutionsLoading || articlesLoading;
 
   useEffect(() => {
     const unsub = subscribeCountriesStatus(setCountryStatus);
@@ -162,39 +162,25 @@ export const Explorer: React.FC = () => {
     };
   }, []);
 
-  // Load constitutions
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    fetchConstitutions().then((data) => {
-      if (!cancelled) {
-        setConstitutions(data);
-        setLoading(false);
-      }
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  // When viewing a country, fetch its articles
+  // When viewing a country, fetch its articles through the cached getter —
+  // second visit to the same country is instant.
   useEffect(() => {
     if (!constitutionId) {
       setArticles([]);
       return;
     }
     let cancelled = false;
-    setLoading(true);
-    fetchArticles(constitutionId).then((data) => {
+    setArticlesLoading(true);
+    getArticles(constitutionId).then((data) => {
       if (cancelled) return;
       setArticles(data);
       setActiveArticleId(data[0]?.id ?? null);
-      setLoading(false);
+      setArticlesLoading(false);
     });
     return () => {
       cancelled = true;
     };
-  }, [constitutionId]);
+  }, [constitutionId, getArticles]);
 
   // When viewing a country, lock the continent selector to that country's region.
   const activeConstitution = useMemo(
@@ -400,7 +386,13 @@ export const Explorer: React.FC = () => {
             ) : articles.length === 0 ? (
               <p className="text-sm text-slate">No articles available yet.</p>
             ) : (
-              <ul className="space-y-2 text-sm max-h-72 lg:max-h-none overflow-y-auto">
+              <ul
+                // Mobile: short fixed cap. Desktop: fill remaining viewport
+                // height below the sticky offset so the list scrolls in place
+                // while the right column scrolls separately. Without the cap,
+                // 200+ article ToCs would push the sticky Card off-screen.
+                className="space-y-2 text-sm max-h-72 lg:max-h-[calc(100vh-180px)] overflow-y-auto pr-2"
+              >
                 {articles.map((a) => (
                   <li key={a.id}>
                     <a

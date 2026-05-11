@@ -33,14 +33,21 @@ const getRecognition = (): SpeechRecognitionCtor | null => {
 export interface UseVoiceOptions {
   lang?: string;
   onTranscript?: (transcript: string, isFinal: boolean) => void;
+  /** Fired for each spoken word boundary; index resets to -1 on start/stop. */
+  onWordBoundary?: (wordIndex: number) => void;
 }
 
 export const useVoice = ({
   lang = 'en-US',
   onTranscript,
+  onWordBoundary,
 }: UseVoiceOptions = {}) => {
   const RecognitionCtor = getRecognition();
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
+  // Use a ref so the boundary callback always sees the latest function
+  // without re-running speak() on every render.
+  const onWordBoundaryRef = useRef(onWordBoundary);
+  onWordBoundaryRef.current = onWordBoundary;
   const [listening, setListening] = useState(false);
   const [speaking, setSpeaking] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -117,9 +124,25 @@ export const useVoice = ({
       u.lang = lang;
       u.rate = opts?.rate ?? 0.95;
       u.pitch = opts?.pitch ?? 1;
-      u.onstart = () => setSpeaking(true);
-      u.onend = () => setSpeaking(false);
-      u.onerror = () => setSpeaking(false);
+      let wordIdx = -1;
+      u.onstart = () => {
+        setSpeaking(true);
+        onWordBoundaryRef.current?.(-1);
+      };
+      u.onboundary = (e) => {
+        // Browsers vary: some only fire for "word", some emit "sentence" too.
+        if (e.name && e.name !== 'word') return;
+        wordIdx++;
+        onWordBoundaryRef.current?.(wordIdx);
+      };
+      u.onend = () => {
+        setSpeaking(false);
+        onWordBoundaryRef.current?.(-1);
+      };
+      u.onerror = () => {
+        setSpeaking(false);
+        onWordBoundaryRef.current?.(-1);
+      };
       window.speechSynthesis.speak(u);
     },
     [supportsSynthesis, lang],
@@ -129,6 +152,7 @@ export const useVoice = ({
     if (!supportsSynthesis) return;
     window.speechSynthesis.cancel();
     setSpeaking(false);
+    onWordBoundaryRef.current?.(-1);
   }, [supportsSynthesis]);
 
   return {

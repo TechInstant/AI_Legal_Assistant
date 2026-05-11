@@ -49,6 +49,36 @@ const degradedNotice: Record<NonNullable<Message['degraded']>, string> = {
     'No constitutional text is yet indexed for this country — only a basic country profile. The Wikipedia link in the source has fuller information.',
 };
 
+// Splits the spoken text into whitespace-delimited word spans so we can
+// karaoke-highlight whichever one the TTS engine is currently pronouncing.
+// Light/dark aware via brand tokens; spans flow inline so they wrap
+// naturally on small screens without breaking the bubble layout.
+const renderReadingText = (text: string, activeIdx: number) => {
+  const tokens = text.split(/(\s+)/);
+  let wordIndex = -1;
+  return (
+    <p className="leading-relaxed">
+      {tokens.map((tok, i) => {
+        if (/^\s+$/.test(tok)) return <span key={i}>{tok}</span>;
+        wordIndex++;
+        const isActive = wordIndex === activeIdx;
+        return (
+          <span
+            key={i}
+            className={
+              isActive
+                ? 'bg-brand-500/25 text-brand-700 dark:bg-brand-500/35 dark:text-brand-50 rounded px-0.5 transition-colors duration-100'
+                : 'transition-colors duration-100'
+            }
+          >
+            {tok}
+          </span>
+        );
+      })}
+    </p>
+  );
+};
+
 const renderMarkdownish = (text: string) =>
   text.split('\n').map((line, i) => {
     if (line.startsWith('> ')) {
@@ -97,15 +127,59 @@ const renderInline = (line: string) => {
   });
 };
 
-// Strip markdown-ish formatting + the metadata footer line for cleaner TTS.
+// Expand legal abbreviations and Roman numerals so TTS reads the text like
+// a lawyer would, not letter-by-letter ("Art. IV" → "Article four").
+const ROMAN_NUMERALS: Record<string, string> = {
+  I: 'one', II: 'two', III: 'three', IV: 'four', V: 'five',
+  VI: 'six', VII: 'seven', VIII: 'eight', IX: 'nine', X: 'ten',
+  XI: 'eleven', XII: 'twelve', XIII: 'thirteen', XIV: 'fourteen', XV: 'fifteen',
+  XVI: 'sixteen', XVII: 'seventeen', XVIII: 'eighteen', XIX: 'nineteen', XX: 'twenty',
+  XXI: 'twenty-one', XXII: 'twenty-two', XXIII: 'twenty-three',
+  XXIV: 'twenty-four', XXV: 'twenty-five', XXVI: 'twenty-six',
+  XXVII: 'twenty-seven', XXVIII: 'twenty-eight', XXIX: 'twenty-nine',
+  XXX: 'thirty',
+};
+
+const preprocessLegalText = (raw: string): string => {
+  let t = raw;
+  // Roman numerals after legal-heading words.
+  t = t.replace(
+    /\b(Article|Articles|Chapter|Chapters|Section|Sections|Amendment|Amendments|Part|Title|Book|Clause)\s+([IVX]{1,6})\b/g,
+    (m, prefix, roman) =>
+      ROMAN_NUMERALS[roman] ? `${prefix} ${ROMAN_NUMERALS[roman]}` : m,
+  );
+  // Abbreviations.
+  t = t
+    .replace(/\bArt\.\s?/g, 'Article ')
+    .replace(/\bArts\.\s?/g, 'Articles ')
+    .replace(/\bSec\.\s?/g, 'Section ')
+    .replace(/\bSecs\.\s?/g, 'Sections ')
+    .replace(/\bAmend\.\s?/g, 'Amendment ')
+    .replace(/\bCh\.\s?/g, 'Chapter ')
+    .replace(/\bCl\.\s?/g, 'Clause ')
+    .replace(/§\s?(\d)/g, 'section $1')
+    .replace(/\betc\./gi, 'etcetera')
+    .replace(/\bi\.e\./gi, 'that is')
+    .replace(/\be\.g\./gi, 'for example')
+    .replace(/\bcf\./gi, 'compare')
+    .replace(/\bvs?\./gi, 'versus');
+  // "Article 16.16" reads better as "Article sixteen, paragraph sixteen".
+  t = t.replace(/\b(Article|Section)\s+(\d+)\.(\d+)\b/g, '$1 $2, paragraph $3');
+  return t;
+};
+
+// Strip markdown-ish formatting + the metadata footer, then pass through
+// the legal-text preprocessor.
 const cleanForSpeech = (text: string) =>
-  text
-    .replace(/_AI responses[^_]+_/g, '')
-    .replace(/\*\*([^*]+)\*\*/g, '$1')
-    .replace(/[•>]/g, '')
-    .replace(/\n+/g, '. ')
-    .replace(/\s+/g, ' ')
-    .trim();
+  preprocessLegalText(
+    text
+      .replace(/_AI responses[^_]+_/g, '')
+      .replace(/\*\*([^*]+)\*\*/g, '$1')
+      .replace(/[•>]/g, '')
+      .replace(/\n+/g, '. ')
+      .replace(/\s+/g, ' ')
+      .trim(),
+  );
 
 export const Assistant: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -124,6 +198,9 @@ export const Assistant: React.FC = () => {
   const [streaming, setStreaming] = useState(false);
   const [autoSpeak, setAutoSpeak] = useState(false);
   const [activeSpeakingId, setActiveSpeakingId] = useState<string | null>(null);
+  // Index of the word the TTS is currently pronouncing in the active message.
+  // -1 when not speaking. Used to drive the karaoke-style highlight.
+  const [readingWordIndex, setReadingWordIndex] = useState(-1);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -135,6 +212,7 @@ export const Assistant: React.FC = () => {
         ask(transcript);
       }
     },
+    onWordBoundary: setReadingWordIndex,
   });
 
   // Track when speech ends to clear the speaking-id badge
@@ -355,7 +433,13 @@ export const Assistant: React.FC = () => {
                 } p-3 sm:p-4 max-w-[85%] sm:max-w-[88%] space-y-2 shadow-sm leading-relaxed text-[13px] sm:text-sm break-words`}
               >
                 {msg.role === 'assistant' ? (
-                  <div className="space-y-1">{renderMarkdownish(msg.content)}</div>
+                  activeSpeakingId === msg.id && msg.plain ? (
+                    renderReadingText(msg.plain, readingWordIndex)
+                  ) : (
+                    <div className="space-y-1">
+                      {renderMarkdownish(msg.content)}
+                    </div>
+                  )
                 ) : (
                   <p>{msg.content}</p>
                 )}

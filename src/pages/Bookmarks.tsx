@@ -4,29 +4,29 @@ import { Bookmark, ChevronRight, Loader2, Trash2 } from 'lucide-react';
 import { Card } from '../components/Card';
 import { Button } from '../components/Button';
 import { useBookmarks } from '../lib/useBookmarks';
-import { fetchAllArticles, fetchConstitutions, type Article, type Constitution } from '../services/api';
+import { type Article, type Constitution } from '../services/api';
 import { regionLabel, regionColorClass } from '../data/constitutions';
+import { useData } from '../context/DataContext';
 
 export const Bookmarks: React.FC = () => {
   const { items, remove } = useBookmarks();
+  const { constitutions, constitutionsLoading, getAllArticles } = useData();
   const [articles, setArticles] = useState<Article[]>([]);
-  const [constitutions, setConstitutions] = useState<Constitution[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [articlesLoading, setArticlesLoading] = useState(true);
+
+  const loading = constitutionsLoading || articlesLoading;
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([fetchAllArticles(), fetchConstitutions()]).then(
-      ([allArticles, allConst]) => {
-        if (cancelled) return;
-        setArticles(allArticles);
-        setConstitutions(allConst);
-        setLoading(false);
-      },
-    );
+    getAllArticles().then((all) => {
+      if (cancelled) return;
+      setArticles(all);
+      setArticlesLoading(false);
+    });
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [getAllArticles]);
 
   const articlesById = useMemo(() => {
     const m = new Map<string, Article>();
