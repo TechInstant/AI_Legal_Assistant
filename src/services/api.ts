@@ -124,15 +124,27 @@ export const fetchArticles = async (
 
 export const fetchAllArticles = async (): Promise<Article[]> => {
   if (isPlaceholderEnv) return bundledArticles;
+  // PostgREST/Supabase caps a single SELECT at 1000 rows by default. The
+  // articles table can have 25k+ rows after a full Constitute seed, so we
+  // page through with .range() until an empty/short page signals the end.
+  const PAGE_SIZE = 1000;
   try {
-    const { data, error } = await supabase
-      .from('articles')
-      .select('*')
-      .order('constitution_id', { ascending: true })
-      .order('ord', { ascending: true, nullsFirst: false });
-    if (error) throw error;
-    if (!data || data.length === 0) return bundledArticles;
-    return data as Article[];
+    const all: Article[] = [];
+    for (let from = 0; ; from += PAGE_SIZE) {
+      const { data, error } = await supabase
+        .from('articles')
+        .select('*')
+        .order('constitution_id', { ascending: true })
+        .order('ord', { ascending: true, nullsFirst: false })
+        .range(from, from + PAGE_SIZE - 1);
+      if (error) throw error;
+      if (!data || data.length === 0) break;
+      all.push(...(data as Article[]));
+      if (data.length < PAGE_SIZE) break;
+    }
+    if (all.length === 0) return bundledArticles;
+    console.info(`[api] fetched ${all.length} articles from Supabase.`);
+    return all;
   } catch (err) {
     console.warn('[api] all-articles fetch failed, using bundled.', err);
     return bundledArticles;
