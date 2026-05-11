@@ -12,19 +12,20 @@ import {
 import { Button } from '../components/Button';
 import { Card } from '../components/Card';
 import { Link, useNavigate } from 'react-router-dom';
-import { fetchConstitutions, type Constitution } from '../services/api';
+import { type Constitution } from '../services/api';
 import { regionLabel, regionColorClass, type Region } from '../data/constitutions';
 import { ContinentSelector } from '../components/ContinentSelector';
 import { CountryDropdown } from '../components/CountryDropdown';
 import { useAuth } from '../context/AuthContext';
 import { useBookmarks, useRecentlyViewed } from '../lib/useBookmarks';
+import { useData } from '../context/DataContext';
 
 export const Home: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { items: bookmarks } = useBookmarks();
   const { items: recent } = useRecentlyViewed();
-  const [constitutions, setConstitutions] = useState<Constitution[]>([]);
+  const { constitutions } = useData();
   const [continent, setContinent] = useState<Region | 'all'>('all');
   const [countryId, setCountryId] = useState<string | null>(null);
   const [query, setQuery] = useState('');
@@ -41,10 +42,6 @@ export const Home: React.FC = () => {
       .toUpperCase() ||
     user?.email?.[0]?.toUpperCase() ||
     'U';
-
-  useEffect(() => {
-    fetchConstitutions().then(setConstitutions);
-  }, []);
 
   // When continent changes, clear any country selection that no longer fits.
   useEffect(() => {

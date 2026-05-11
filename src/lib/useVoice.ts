@@ -48,6 +48,16 @@ export const useVoice = ({
   // without re-running speak() on every render.
   const onWordBoundaryRef = useRef(onWordBoundary);
   onWordBoundaryRef.current = onWordBoundary;
+  // Timer for the boundary-fallback path. iOS Safari and some Android
+  // browsers don't fire SpeechSynthesisUtterance.onboundary, so when no
+  // real boundary arrives within ~1.2s we drive the highlight on a timer.
+  const fallbackTimer = useRef<number | null>(null);
+  const clearFallback = () => {
+    if (fallbackTimer.current != null) {
+      clearTimeout(fallbackTimer.current);
+      fallbackTimer.current = null;
+    }
+  };
   const [listening, setListening] = useState(false);
   const [speaking, setSpeaking] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -120,26 +130,54 @@ export const useVoice = ({
         return;
       }
       window.speechSynthesis.cancel();
+      clearFallback();
       const u = new SpeechSynthesisUtterance(text);
       u.lang = lang;
-      u.rate = opts?.rate ?? 0.95;
+      const rate = opts?.rate ?? 0.95;
+      u.rate = rate;
       u.pitch = opts?.pitch ?? 1;
+
+      // Split for the timer fallback. ~14 chars/sec at rate 1.0 is the
+      // typical English TTS pace; adjust per word so "constitutionally"
+      // gets more time than "the".
+      const words = text.trim().split(/\s+/);
+      const charsPerSec = 14 * rate;
       let wordIdx = -1;
+      let boundaryFired = false;
+
+      function advanceFallback() {
+        wordIdx++;
+        if (wordIdx >= words.length) return;
+        onWordBoundaryRef.current?.(wordIdx);
+        const wordLen = (words[wordIdx]?.length ?? 4) + 1; // +1 for space
+        const delay = Math.max(80, (wordLen / charsPerSec) * 1000);
+        fallbackTimer.current = window.setTimeout(advanceFallback, delay);
+      }
+
       u.onstart = () => {
         setSpeaking(true);
         onWordBoundaryRef.current?.(-1);
+        // If the engine doesn't emit boundary events within 1.2s, take
+        // over with the timer. Mobile Safari especially.
+        fallbackTimer.current = window.setTimeout(() => {
+          if (!boundaryFired) advanceFallback();
+        }, 1200);
       };
       u.onboundary = (e) => {
-        // Browsers vary: some only fire for "word", some emit "sentence" too.
         if (e.name && e.name !== 'word') return;
+        // A real boundary fired — abandon any pending timer.
+        boundaryFired = true;
+        clearFallback();
         wordIdx++;
         onWordBoundaryRef.current?.(wordIdx);
       };
       u.onend = () => {
+        clearFallback();
         setSpeaking(false);
         onWordBoundaryRef.current?.(-1);
       };
       u.onerror = () => {
+        clearFallback();
         setSpeaking(false);
         onWordBoundaryRef.current?.(-1);
       };
@@ -150,6 +188,7 @@ export const useVoice = ({
 
   const stopSpeaking = useCallback(() => {
     if (!supportsSynthesis) return;
+    clearFallback();
     window.speechSynthesis.cancel();
     setSpeaking(false);
     onWordBoundaryRef.current?.(-1);

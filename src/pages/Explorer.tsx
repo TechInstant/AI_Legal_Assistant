@@ -374,49 +374,63 @@ export const Explorer: React.FC = () => {
           activeConstitution && !activeConstitution.indexed ? 'hidden' : ''
         }`}
       >
-        <div className="lg:col-span-1 order-2 lg:order-1">
-          <Card className="p-4 lg:sticky lg:top-28">
-            <h3 className="text-base mb-3 sm:mb-4 font-semibold">
-              Table of Contents
-            </h3>
-            {loading ? (
-              <div className="flex items-center gap-2 text-sm text-slate">
-                <Loader2 className="w-4 h-4 animate-spin" /> Loading…
-              </div>
-            ) : articles.length === 0 ? (
-              <p className="text-sm text-slate">No articles available yet.</p>
-            ) : (
-              <ul
-                // Mobile: short fixed cap. Desktop: fill remaining viewport
-                // height below the sticky offset so the list scrolls in place
-                // while the right column scrolls separately. Without the cap,
-                // 200+ article ToCs would push the sticky Card off-screen.
-                className="space-y-2 text-sm max-h-72 lg:max-h-[calc(100vh-180px)] overflow-y-auto pr-2"
+        {/* ToC — collapsed <details> at the top on mobile (so it isn't
+            buried below 200+ articles), sticky sidebar on desktop. */}
+        <div className="lg:col-span-1 order-1 lg:order-1">
+          <Card className="p-0 lg:p-4 lg:sticky lg:top-28">
+            <details className="lg:open:block group" open>
+              <summary
+                className="flex items-center justify-between gap-2 list-none cursor-pointer
+                           p-4 lg:p-0 lg:cursor-default
+                           [&::-webkit-details-marker]:hidden"
               >
-                {articles.map((a) => (
-                  <li key={a.id}>
-                    <a
-                      href={`#${a.id}`}
-                      onClick={() => setActiveArticleId(a.id)}
-                      className={`block py-1 transition-colors ${
-                        activeArticleId === a.id
-                          ? 'text-iris-500 font-medium'
-                          : 'text-slate dark:text-mist hover:text-iris-500'
-                      }`}
-                    >
-                      <span className="text-[10px] sm:text-xs uppercase tracking-wider block">
-                        {a.chapter}
-                      </span>
-                      {a.article_number} — {a.title}
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            )}
+                <h3 className="text-base font-semibold m-0">
+                  Table of Contents
+                </h3>
+                <ChevronRight
+                  className="lg:hidden w-4 h-4 text-slate transition-transform group-open:rotate-90"
+                />
+              </summary>
+              <div className="px-4 pb-4 lg:px-0 lg:pb-0 lg:mt-3 sm:mt-4">
+                {loading ? (
+                  <div className="flex items-center gap-2 text-sm text-slate">
+                    <Loader2 className="w-4 h-4 animate-spin" /> Loading…
+                  </div>
+                ) : articles.length === 0 ? (
+                  <p className="text-sm text-slate">No articles available yet.</p>
+                ) : (
+                  <ul
+                    // Mobile: tighter cap so the list doesn't push the article
+                    // body too far down when expanded. Desktop: fill remaining
+                    // viewport height below the sticky offset.
+                    className="space-y-2 text-sm max-h-[50vh] lg:max-h-[calc(100vh-180px)] overflow-y-auto pr-2"
+                  >
+                    {articles.map((a) => (
+                      <li key={a.id}>
+                        <a
+                          href={`#${a.id}`}
+                          onClick={() => setActiveArticleId(a.id)}
+                          className={`block py-1 transition-colors ${
+                            activeArticleId === a.id
+                              ? 'text-iris-500 font-medium'
+                              : 'text-slate dark:text-mist hover:text-iris-500'
+                          }`}
+                        >
+                          <span className="text-[10px] sm:text-xs uppercase tracking-wider block">
+                            {a.chapter}
+                          </span>
+                          {a.article_number} — {a.title}
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </details>
           </Card>
         </div>
 
-        <div className="lg:col-span-3 order-1 lg:order-2 space-y-5 sm:space-y-8">
+        <div className="lg:col-span-3 order-2 lg:order-2 space-y-5 sm:space-y-8">
           {loading ? (
             <div className="flex justify-center py-16 sm:py-20">
               <Loader2 className="w-10 h-10 sm:w-12 sm:h-12 animate-spin text-iris-500/60" />
