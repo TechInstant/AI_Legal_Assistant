@@ -19,3 +19,12 @@
 
   # Discourages legacy XSS auditors from breaking modern apps.
   X-XSS-Protection: 0
+
+  # Content Security Policy — restricts what the page can load. The current
+  # third-party origins we depend on are listed explicitly.
+  #   'unsafe-inline' on style-src is required for Tailwind's runtime styles.
+  #   'unsafe-inline' on script-src is required for Vite's module preload
+  #   shim in the index.html. Remove if you move to a nonce-based CSP.
+  #   blob: on script-src is needed if you add a service worker that ships
+  #   a generated script (vite-plugin-pwa does this).
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https: ; connect-src 'self' https://*.supabase.co https://restcountries.com https://en.wikipedia.org https://openrouter.ai https://www.constituteproject.org; media-src 'self' blob:; worker-src 'self' blob:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'

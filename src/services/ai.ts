@@ -146,6 +146,53 @@ function buildIndexFrom(
   return { entries, idf, boosts: buildBoosts(constitutionList), source };
 }
 
+// Async variant — yields to the event loop every CHUNK articles so that
+// building a 16k-article TF-IDF on a low-end Android doesn't freeze the
+// UI thread for 2-3 seconds. Same shape and result as buildIndexFrom.
+async function buildIndexFromAsync(
+  articleList: Array<BundledArticle | Article>,
+  constitutionList: Array<BundledConstitution | Constitution>,
+  source: 'bundled' | 'supabase',
+): Promise<CorpusIndex> {
+  const CHUNK = 500;
+  const cById = new Map(constitutionList.map((c) => [c.id, c]));
+  const entries: IndexEntry[] = [];
+
+  for (let i = 0; i < articleList.length; i += CHUNK) {
+    const end = Math.min(i + CHUNK, articleList.length);
+    for (let j = i; j < end; j++) {
+      const a = articleList[j];
+      const constitution = cById.get(a.constitution_id);
+      if (!constitution) continue;
+      const tokens = tokenize(`${a.title} ${a.content} ${a.chapter}`);
+      const tf = new Map<string, number>();
+      tokens.forEach((t) => tf.set(t, (tf.get(t) ?? 0) + 1));
+      entries.push({
+        article: a,
+        constitution,
+        termFreq: tf,
+        length: tokens.length || 1,
+      });
+    }
+    if (end < articleList.length) {
+      // Hand the main thread back so the browser can paint a frame.
+      await new Promise<void>((r) => setTimeout(r, 0));
+    }
+  }
+
+  const df = new Map<string, number>();
+  for (const e of entries) {
+    for (const t of e.termFreq.keys()) df.set(t, (df.get(t) ?? 0) + 1);
+  }
+  const N = entries.length || 1;
+  const idf = new Map<string, number>();
+  for (const [term, freq] of df) {
+    idf.set(term, Math.log(1 + N / freq));
+  }
+
+  return { entries, idf, boosts: buildBoosts(constitutionList), source };
+}
+
 function buildIndex(): CorpusIndex {
   if (indexCache) return indexCache;
   // Synchronous fallback while preloadCorpus() is in flight.
@@ -167,7 +214,8 @@ export async function preloadCorpus(): Promise<void> {
         fetchAllArticles(),
       ]);
       if (allArticles.length === 0 || allCons.length === 0) return;
-      indexCache = buildIndexFrom(allArticles, allCons, 'supabase');
+      // Chunked build keeps the UI responsive while ~16k articles tokenize.
+      indexCache = await buildIndexFromAsync(allArticles, allCons, 'supabase');
       console.info(
         `[ai] corpus loaded: ${allArticles.length} articles across ${allCons.length} countries (Supabase).`,
       );

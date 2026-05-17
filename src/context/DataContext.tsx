@@ -39,11 +39,27 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     let cancelled = false;
-    fetchConstitutions().then((data) => {
-      if (cancelled) return;
-      setConstitutions(data);
-      setConstitutionsLoading(false);
-    });
+    // Retry-with-backoff so a single transient network blip doesn't leave
+    // the user staring at an empty Explorer on a flaky connection.
+    const load = async () => {
+      const delays = [0, 1500, 4000];
+      for (const wait of delays) {
+        if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+        try {
+          const data = await fetchConstitutions();
+          if (cancelled) return;
+          if (data.length > 0) {
+            setConstitutions(data);
+            setConstitutionsLoading(false);
+            return;
+          }
+        } catch (err) {
+          console.warn('[data] fetchConstitutions failed; retrying', err);
+        }
+      }
+      if (!cancelled) setConstitutionsLoading(false);
+    };
+    load();
     return () => {
       cancelled = true;
     };

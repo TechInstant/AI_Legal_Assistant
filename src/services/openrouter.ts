@@ -3,15 +3,25 @@
 
 import type { ScoredArticle } from './ai';
 
-const API_URL = 'https://openrouter.ai/api/v1/chat/completions';
+// When VITE_OPENROUTER_PROXY_URL is set (a deployed Supabase Edge Function),
+// route requests through it so the OpenRouter API key never appears in the
+// browser bundle. Otherwise, fall back to a direct OpenRouter call —
+// acceptable for the :free model tier while you bootstrap.
+const PROXY_URL = import.meta.env.VITE_OPENROUTER_PROXY_URL as
+  | string
+  | undefined;
+const API_URL = PROXY_URL || 'https://openrouter.ai/api/v1/chat/completions';
 // Currently-live free models (check openrouter.ai/models?max_price=0 for fresh list):
 //   google/gemma-4-31b-it:free                       — Google Gemma 4, 31B, instruction-tuned
 //   nvidia/nemotron-3-super-120b-a12b:free           — NVIDIA Nemotron, 120B
 //   meta-llama/llama-3.3-70b-instruct:free           — Llama 3.3 (often rate-limited)
 const DEFAULT_MODEL = 'google/gemma-4-31b-it:free';
-// Tried in order when the configured model 429s. Less popular first — these
-// tend to have free-tier quota left when Llama/Gemma are saturated.
+// Tried in order when the configured model 429s. Smaller / less popular
+// models first — they typically have free-tier quota left when the popular
+// big models (Gemma 31B, Llama 70B) are saturated.
 const FALLBACK_MODELS = [
+  'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free',
+  'google/gemma-4-26b-a4b-it:free',
   'nvidia/nemotron-3-super-120b-a12b:free',
   'meta-llama/llama-3.3-70b-instruct:free',
 ];
@@ -19,28 +29,49 @@ const FALLBACK_MODELS = [
 const apiKey = import.meta.env.VITE_OPENROUTER_API_KEY as string | undefined;
 const model =
   (import.meta.env.VITE_OPENROUTER_MODEL as string | undefined) || DEFAULT_MODEL;
+// Supabase gateway requires the anon key as `apikey` header even on
+// no-verify-jwt functions — without it the preflight 401s before the
+// function ever runs. Reused here so the browser can talk to the proxy.
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as
+  | string
+  | undefined;
 
-export const isOpenRouterConfigured = (): boolean => !!apiKey;
+// Configured when EITHER a proxy is deployed (preferred — key stays
+// server-side) OR a direct browser-side key is set.
+export const isOpenRouterConfigured = (): boolean => !!apiKey || !!PROXY_URL;
 export const openRouterModel = (): string => model;
 
-const SYSTEM_PROMPT = `You are LexIntell, a constitutional intelligence assistant.
+// Solid, narrow RAG prompt — derived from the QA_PROMPT_TEMPLATE pattern.
+// Two principles drive it: (1) the model answers ONLY from the provided
+// CONTEXT, never from training-data memory of constitutions; (2) every
+// non-trivial claim is cited with [Source N] so the user can verify.
+const SYSTEM_PROMPT = `You are LexIntell, a constitutional research assistant.
 
-STRICT RULES:
-1. Answer ONLY using the SOURCES provided in the user message. Never use any outside knowledge of constitutions or laws.
-2. Cite every factual claim inline with [Source N] where N is the source number.
-3. If the sources do not contain the answer, say so plainly and recommend the closest related source from the list.
-4. Quote exact constitutional text where it makes the answer clearer; place quotations on a new line prefixed with "> ".
-5. Be concise — at most 3-5 short paragraphs. Do not pad or repeat the question.
-6. End every reply with this disclaimer on its own line:
-_AI responses are informational and not legal advice._`;
+NON-NEGOTIABLE RULES:
+1. Answer the user's question based ONLY on the CONTEXT block in the user message. Do not use outside knowledge of any constitution, statute, case law, or legal commentary. If you find yourself wanting to cite something not in the CONTEXT, you must not.
+2. If the CONTEXT does not contain enough information to answer, say so plainly using this exact phrasing as your opening line:
+   "The provided sources do not contain a direct answer to that."
+   Then recommend the most closely related source from the list, naming the country and article.
+3. Cite every factual claim inline using the bracket form [Source N], where N is the source number from the CONTEXT. Do not invent source numbers.
+4. When the answer hinges on the exact wording of a constitutional provision, quote it on a new line prefixed with "> " and attribute it: country name + article/section number.
+5. Be concise — at most 3 to 5 short paragraphs. Do not restate the question, pad with filler, or interpret beyond what the text says.
+6. You are a research tool, not legal counsel. Do not give legal advice, predict court outcomes, or recommend actions a person should take.
+7. End every reply with this disclaimer on its own line, exactly:
+_AI responses are informational and not legal advice. Consult a qualified attorney for binding interpretation._`;
 
+// Builds the CONTEXT block matching the QA_PROMPT_TEMPLATE shape — clearly
+// delimited so the model can't confuse it with the question or its own
+// reasoning scratchpad.
 const buildContext = (sources: ScoredArticle[]): string =>
   sources
     .map(
       (s, i) =>
-        `[Source ${i + 1}] ${s.constitution.country} — ${s.article.article_number} — ${s.article.title} (${s.article.chapter})\n${s.article.content}`,
+        `[Source ${i + 1}] ${s.constitution.country} — ${s.article.article_number}: ${s.article.title}\nChapter: ${s.article.chapter}\n${s.article.content}`,
     )
-    .join('\n\n');
+    .join('\n\n---\n\n');
+
+const buildUserMessage = (question: string, sources: ScoredArticle[]): string =>
+  `CONTEXT:\n---\n${buildContext(sources)}\n---\n\nQuestion: ${question}\n\nAnswer:`;
 
 export interface RagOptions {
   question: string;
@@ -57,13 +88,25 @@ async function postWithRetry(
   body: string,
   signal: AbortSignal | undefined,
 ): Promise<Response> {
-  const headers = {
-    Authorization: `Bearer ${apiKey}`,
+  // Header set differs by destination to keep the CORS preflight surface
+  // minimal:
+  //   PROXY  → only Content-Type + Supabase apikey/Authorization (the
+  //            function injects HTTP-Referer + X-Title + OpenRouter auth
+  //            server-side, so no need to ship those here).
+  //   DIRECT → Content-Type + Authorization + OpenRouter's analytics
+  //            attribution headers (HTTP-Referer, X-Title).
+  const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    'HTTP-Referer':
-      typeof window !== 'undefined' ? window.location.origin : 'https://lexintell.app',
-    'X-Title': 'LexIntell',
   };
+  if (PROXY_URL && supabaseAnonKey) {
+    headers.apikey = supabaseAnonKey;
+    headers.Authorization = `Bearer ${supabaseAnonKey}`;
+  } else if (!PROXY_URL && apiKey) {
+    headers.Authorization = `Bearer ${apiKey}`;
+    headers['HTTP-Referer'] =
+      typeof window !== 'undefined' ? window.location.origin : 'https://lexintell.app';
+    headers['X-Title'] = 'LexIntell';
+  }
 
   // Retry-once on 429 — handles brief upstream rate-limit blips on the
   // free Llama tier. The fallback to local quotation answers handles
@@ -84,16 +127,16 @@ async function postWithRetry(
 }
 
 function buildBody(modelId: string, opts: RagOptions): string {
-  const userMessage =
-    `Question: ${opts.question}\n\nSOURCES:\n${buildContext(opts.sources)}`;
   return JSON.stringify({
     model: modelId,
     stream: true,
-    temperature: 0.2,
+    // Lower temperature for legal/factual answers — we want predictable
+    // adherence to the source text, not creative paraphrasing.
+    temperature: 0.15,
     max_tokens: 800,
     messages: [
       { role: 'system', content: SYSTEM_PROMPT },
-      { role: 'user', content: userMessage },
+      { role: 'user', content: buildUserMessage(opts.question, opts.sources) },
     ],
   });
 }
@@ -137,13 +180,15 @@ async function streamFromResponse(
 }
 
 export const streamRAG = async (opts: RagOptions): Promise<void> => {
-  if (!apiKey) throw new Error('OpenRouter API key not configured.');
+  if (!apiKey && !PROXY_URL) {
+    throw new Error('OpenRouter is not configured (no API key and no proxy URL).');
+  }
 
   // Try the configured model first, then rotate through fallbacks on 429.
   // De-dupe in case the configured model also appears in the fallback list.
   const candidates = Array.from(new Set([model, ...FALLBACK_MODELS]));
 
-  let lastErr;
+  let lastErr: unknown;
   for (let i = 0; i < candidates.length; i++) {
     const m = candidates[i];
     try {

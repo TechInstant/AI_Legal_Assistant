@@ -1,0 +1,11 @@
+# Allow all well-behaved crawlers.
+User-agent: *
+Allow: /
+
+# Hint the canonical sitemap.
+Sitemap: https://constitution-assistant.netlify.app/sitemap.xml
+
+# Don't bother indexing auth pages — nothing for crawlers there.
+Disallow: /login
+Disallow: /signup
+Disallow: /bookmarks

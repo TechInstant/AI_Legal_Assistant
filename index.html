@@ -2,14 +2,48 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#24772D" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0E1322" media="(prefers-color-scheme: dark)" />
+
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#24772D" />
-    <meta name="description" content="Explore the constitutions of every country with a built-in legal AI assistant." />
-    <title>Constitution Assistant</title>
+    <link rel="apple-touch-icon" href="/favicon.svg" />
+
+    <title>Constitution Assistant — The World's Constitutions, Cited and Understood</title>
+    <meta name="description" content="Browse, listen to, and ask questions about constitutional law from every country. Every AI answer carries cited primary sources. Free and globally available." />
+    <meta name="application-name" content="Constitution Assistant" />
+    <meta name="author" content="Constitution Assistant" />
+
+    <!-- Open Graph (Facebook, LinkedIn, WhatsApp link previews) -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Constitution Assistant — Global Constitutional Intelligence" />
+    <meta property="og:description" content="Search, read, and ask AI about every nation's constitution. Cited, sourced, free." />
+    <meta property="og:image" content="/favicon.svg" />
+    <meta property="og:locale" content="en_US" />
+    <meta property="og:site_name" content="Constitution Assistant" />
+
+    <!-- Twitter / X cards -->
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="Constitution Assistant — Global Constitutional Intelligence" />
+    <meta name="twitter:description" content="Search, read, and ask AI about every nation's constitution. Cited, sourced, free." />
+    <meta name="twitter:image" content="/favicon.svg" />
+
+    <!-- Search engines -->
+    <meta name="robots" content="index, follow" />
+    <link rel="canonical" href="https://constitution-assistant.netlify.app/" />
+
+    <!-- Performance hints — let the browser warm DNS for the APIs we will hit -->
+    <link rel="dns-prefetch" href="https://restcountries.com" />
+    <link rel="dns-prefetch" href="https://en.wikipedia.org" />
+    <link rel="preconnect" href="https://openrouter.ai" crossorigin />
   </head>
   <body>
     <div id="root"></div>
+    <noscript>
+      <p style="font-family: system-ui, sans-serif; padding: 2rem; text-align: center; color: #444;">
+        Constitution Assistant needs JavaScript enabled to work. Please enable JavaScript and refresh the page.
+      </p>
+    </noscript>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
