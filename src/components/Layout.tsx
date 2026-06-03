@@ -20,6 +20,7 @@ import { Button } from './Button';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { WorldMap } from './WorldMap';
+import { useTranslation } from 'react-i18next';
 
 export const Layout: React.FC = () => {
   const location = useLocation();
@@ -28,12 +29,14 @@ export const Layout: React.FC = () => {
   const { user, signOut, loading } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
+  const { t, i18n } = useTranslation();
 
   const navItems = [
-    { name: 'Home', path: '/', icon: Home, exact: true, authOnly: false },
-    { name: 'Explorer', path: '/explorer', icon: BookOpen, exact: false, authOnly: false },
-    { name: 'Assistant', path: '/assistant', icon: MessageSquare, exact: false, authOnly: false },
-    { name: 'Bookmarks', path: '/bookmarks', icon: Bookmark, exact: false, authOnly: true },
+    { name: t('nav.home'), path: '/', icon: Home, exact: true, authOnly: false },
+    { name: t('nav.explorer'), path: '/explorer', icon: BookOpen, exact: false, authOnly: false },
+    { name: t('nav.assistant'), path: '/assistant', icon: MessageSquare, exact: false, authOnly: false },
+    { name: t('nav.bookmarks'), path: '/bookmarks', icon: Bookmark, exact: false, authOnly: true },
+    { name: t('nav.blog'), path: '/blog', icon: BookOpen, exact: false, authOnly: false },
   ];
 
   const visibleNavItems = navItems.filter((i) => !i.authOnly || !!user);
@@ -102,7 +105,7 @@ export const Layout: React.FC = () => {
                 <Scale className="w-5 h-5" />
               </div>
               <span className="font-serif font-bold text-xl tracking-wide text-world-deep-ocean dark:text-world-sand hidden sm:block">
-                Lex<span className="gradient-world">Intell</span>
+                Juri<span className="gradient-world">Sphere</span>
               </span>
             </Link>
 
@@ -132,6 +135,16 @@ export const Layout: React.FC = () => {
 
             {/* Action Buttons */}
             <div className="hidden md:flex items-center gap-3">
+              <select 
+                value={i18n.resolvedLanguage || 'en'} 
+                onChange={(e) => i18n.changeLanguage(e.target.value)}
+                className="bg-transparent text-sm font-medium text-brand-slate dark:text-brand-mist hover:text-world-ocean outline-none border-none cursor-pointer px-1"
+              >
+                <option value="en">EN</option>
+                <option value="es">ES</option>
+                <option value="fr">FR</option>
+              </select>
+
               <button
                 onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
                 className="p-2 text-brand-slate dark:text-brand-mist hover:text-world-ocean transition-colors"
@@ -262,7 +275,7 @@ export const Layout: React.FC = () => {
                     <Scale className="w-4 h-4" />
                   </div>
                   <span className="font-serif font-bold text-lg">
-                    Lex<span className="gradient-world">Intell</span>
+                    Juri<span className="gradient-world">Sphere</span>
                   </span>
                 </Link>
                 <button
@@ -372,17 +385,16 @@ export const Layout: React.FC = () => {
           </div>
           
           <div className="flex justify-center gap-4 text-xs font-medium">
-            <Link to="/privacy" className="hover:text-iris-500 transition-colors">Privacy Policy</Link>
-            <Link to="/terms" className="hover:text-iris-500 transition-colors">Terms of Service</Link>
+            <Link to="/privacy" className="hover:text-iris-500 transition-colors">{t('footer.privacy')}</Link>
+            <Link to="/terms" className="hover:text-iris-500 transition-colors">{t('footer.terms')}</Link>
           </div>
 
           <p className="max-w-2xl mx-auto text-[10px] sm:text-xs opacity-80">
-            <strong>Disclaimer:</strong> LexIntell is an educational project designed for exploring constitutional texts. It is NOT a substitute for professional legal advice. Do not rely on AI-generated answers for legal compliance.
+            <strong>Disclaimer:</strong> {t('footer.disclaimer')}
           </p>
 
           <p>
-            &copy; {new Date().getFullYear()} LexIntell — Global Constitutional
-            Intelligence.
+            {t('footer.copyright', { year: new Date().getFullYear() })}
           </p>
           <p className="text-[11px] md:text-xs text-slate/80 dark:text-mist/80">
             Powered by{' '}

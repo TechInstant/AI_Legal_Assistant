@@ -4,11 +4,13 @@ import { Loader2, LogIn, ShieldCheck, Eye, EyeOff } from 'lucide-react';
 import { Card } from '../components/Card';
 import { Button } from '../components/Button';
 import { useAuth } from '../context/AuthContext';
+import { useTranslation } from 'react-i18next';
 
 export const Login: React.FC = () => {
   const { signIn } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const { t } = useTranslation();
   const redirectTo = (location.state as { from?: string } | null)?.from ?? '/explorer';
 
   const [email, setEmail] = useState('');
@@ -38,16 +40,16 @@ export const Login: React.FC = () => {
             <ShieldCheck className="w-6 h-6" />
           </div>
           <h1 className="text-2xl md:text-3xl font-serif text-world-deep-ocean dark:text-world-sand">
-            Welcome back
+            {t('auth.welcome_back')}
           </h1>
           <p className="text-sm text-brand-slate dark:text-brand-mist">
-            Sign in to bookmark articles, save notes, and chat with the legal AI.
+            {t('auth.login_subtitle')}
           </p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <label className="block text-sm space-y-1">
-            <span className="text-brand-slate dark:text-brand-mist">Email</span>
+            <span className="text-brand-slate dark:text-brand-mist">{t('auth.email')}</span>
             <input
               type="email"
               required
@@ -60,7 +62,7 @@ export const Login: React.FC = () => {
           </label>
 
           <label className="block text-sm space-y-1">
-            <span className="text-brand-slate dark:text-brand-mist">Password</span>
+            <span className="text-brand-slate dark:text-brand-mist">{t('auth.password')}</span>
             <div className="relative">
               <input
                 type={showPassword ? 'text' : 'password'}
@@ -93,17 +95,20 @@ export const Login: React.FC = () => {
 
           <Button type="submit" disabled={busy} className="w-full py-3">
             {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <LogIn className="w-4 h-4" />}
-            {busy ? 'Signing in…' : 'Sign in'}
+            {busy ? t('auth.signing_in') : t('auth.sign_in')}
           </Button>
           <p className="text-[11px] text-center text-brand-slate dark:text-brand-mist/80 pt-2">
-            By signing in, you agree to our <Link to="/terms" className="underline hover:text-world-ocean">Terms of Service</Link> and <Link to="/privacy" className="underline hover:text-world-ocean">Privacy Policy</Link>.
+            {t('auth.terms_agree_login').split('<terms>')[0]}
+            <Link to="/terms" className="underline hover:text-world-ocean">{t('footer.terms')}</Link>
+            {' '}&{' '}
+            <Link to="/privacy" className="underline hover:text-world-ocean">{t('footer.privacy')}</Link>.
           </p>
         </form>
 
         <p className="text-sm text-center text-brand-slate dark:text-brand-mist">
-          New here?{' '}
+          {t('auth.new_here')}{' '}
           <Link to="/signup" className="text-world-ocean hover:underline font-medium">
-            Create an account
+            {t('auth.create_account')}
           </Link>
         </p>
       </Card>

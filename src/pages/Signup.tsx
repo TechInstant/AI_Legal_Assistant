@@ -4,10 +4,12 @@ import { Loader2, UserPlus, Sparkles, Eye, EyeOff } from 'lucide-react';
 import { Card } from '../components/Card';
 import { Button } from '../components/Button';
 import { useAuth } from '../context/AuthContext';
+import { useTranslation } from 'react-i18next';
 
 export const Signup: React.FC = () => {
   const { signUp } = useAuth();
   const navigate = useNavigate();
+  const { t } = useTranslation();
 
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
@@ -49,16 +51,16 @@ export const Signup: React.FC = () => {
             <Sparkles className="w-6 h-6" />
           </div>
           <h1 className="text-2xl md:text-3xl font-serif text-world-deep-ocean dark:text-world-sand">
-            Join LexIntell
+            {t('auth.join')}
           </h1>
           <p className="text-sm text-brand-slate dark:text-brand-mist">
-            Create an account to save research, get AI explanations, and follow constitutions worldwide.
+            {t('auth.signup_subtitle')}
           </p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <label className="block text-sm space-y-1">
-            <span className="text-brand-slate dark:text-brand-mist">Full name</span>
+            <span className="text-brand-slate dark:text-brand-mist">{t('auth.full_name')}</span>
             <input
               type="text"
               autoComplete="name"
@@ -70,7 +72,7 @@ export const Signup: React.FC = () => {
           </label>
 
           <label className="block text-sm space-y-1">
-            <span className="text-brand-slate dark:text-brand-mist">Email</span>
+            <span className="text-brand-slate dark:text-brand-mist">{t('auth.email')}</span>
             <input
               type="email"
               required
@@ -84,8 +86,8 @@ export const Signup: React.FC = () => {
 
           <label className="block text-sm space-y-1">
             <span className="text-brand-slate dark:text-brand-mist">
-              Password{' '}
-              <span className="text-xs text-brand-slate/70">(min 6 characters)</span>
+              {t('auth.password')}{' '}
+              <span className="text-xs text-brand-slate/70">{t('auth.password_min')}</span>
             </span>
             <div className="relative">
               <input
@@ -124,17 +126,20 @@ export const Signup: React.FC = () => {
 
           <Button type="submit" disabled={busy} className="w-full py-3">
             {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />}
-            {busy ? 'Creating account…' : 'Create account'}
+            {busy ? t('auth.creating') : t('auth.create')}
           </Button>
           <p className="text-[11px] text-center text-brand-slate dark:text-brand-mist/80 pt-2">
-            By creating an account, you agree to our <Link to="/terms" className="underline hover:text-world-ocean">Terms of Service</Link> and <Link to="/privacy" className="underline hover:text-world-ocean">Privacy Policy</Link>.
+            {t('auth.terms_agree_signup').split('<terms>')[0]}
+            <Link to="/terms" className="underline hover:text-world-ocean">{t('footer.terms')}</Link>
+            {' '}&{' '}
+            <Link to="/privacy" className="underline hover:text-world-ocean">{t('footer.privacy')}</Link>.
           </p>
         </form>
 
         <p className="text-sm text-center text-brand-slate dark:text-brand-mist">
-          Already have an account?{' '}
+          {t('auth.already_have')}{' '}
           <Link to="/login" className="text-world-ocean hover:underline font-medium">
-            Sign in
+            {t('auth.sign_in_link')}
           </Link>
         </p>
       </Card>

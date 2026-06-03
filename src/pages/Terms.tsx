@@ -11,14 +11,14 @@ export const Terms: React.FC = () => {
         <section className="space-y-3">
           <h2 className="text-xl font-semibold">1. Acceptance of Terms</h2>
           <p className="text-slate dark:text-mist">
-            By accessing or using LexIntell (the "Service"), you agree to be bound by these Terms of Service. If you disagree with any part of the terms, you may not access the Service.
+            By accessing or using JuriSphere (the "Service"), you agree to be bound by these Terms of Service. If you disagree with any part of the terms, you may not access the Service.
           </p>
         </section>
 
         <section className="space-y-3">
           <h2 className="text-xl font-semibold">2. Educational Purposes Only</h2>
           <p className="text-slate dark:text-mist">
-            <strong>Disclaimer:</strong> LexIntell is an educational tool designed to help users explore constitutional texts. It is NOT a substitute for professional legal advice. The AI-generated summaries and answers should not be relied upon for legal compliance or decision-making.
+            <strong>Disclaimer:</strong> JuriSphere is an educational tool designed to help users explore constitutional texts. It is NOT a substitute for professional legal advice. The AI-generated summaries and answers should not be relied upon for legal compliance or decision-making.
           </p>
         </section>
 
@@ -39,3 +39,4 @@ export const Terms: React.FC = () => {
     </div>
   );
 };
+

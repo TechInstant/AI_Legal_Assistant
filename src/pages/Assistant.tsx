@@ -18,6 +18,7 @@ import {
 import { Button } from '../components/Button';
 import { answerSmart, type CitedAnswer } from '../services/ai';
 import { useVoice } from '../lib/useVoice';
+import { useTranslation } from 'react-i18next';
 
 type Message = {
   id: string;
@@ -182,15 +183,14 @@ const cleanForSpeech = (text: string) =>
   );
 
 export const Assistant: React.FC = () => {
+  const { t } = useTranslation();
   const [searchParams, setSearchParams] = useSearchParams();
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
       role: 'assistant',
-      content:
-        'Hello. I am your Constitutional Intelligence Assistant. I will only quote from the indexed constitutional corpus and always cite my sources. Ask me by typing — or tap the microphone to speak your question.',
-      plain:
-        'Hello. I am your Constitutional Intelligence Assistant. I will only quote from the indexed constitutional corpus and always cite my sources.',
+      content: t('assistant.greeting'),
+      plain: t('assistant.greeting'),
     },
   ]);
   const [input, setInput] = useState('');
@@ -353,12 +353,11 @@ export const Assistant: React.FC = () => {
           <div className="flex items-center gap-2 mb-1">
             <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-iris-500 shrink-0" />
             <h1 className="m-0 text-xl sm:text-2xl md:text-3xl truncate">
-              AI Legal Assistant
+              {t('assistant.title')}
             </h1>
           </div>
           <p className="text-slate dark:text-mist text-[12px] sm:text-sm">
-            Ask anything about constitutional law — every answer carries
-            cited sources.
+            {t('assistant.subtitle')}
           </p>
         </div>
 
@@ -506,7 +505,7 @@ export const Assistant: React.FC = () => {
                 <div className="bg-paper-soft dark:bg-ink-900/60 border border-slate/15 dark:border-ink-700 rounded-2xl rounded-tl-none p-3 sm:p-4 flex items-center gap-2">
                   <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 animate-spin text-iris-500" />
                   <span className="text-slate dark:text-mist text-xs sm:text-sm">
-                    Finding cited sources…
+                    {t('assistant.finding_sources')}
                   </span>
                 </div>
               </div>
@@ -538,7 +537,7 @@ export const Assistant: React.FC = () => {
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && ask(input)}
                 placeholder={
-                  voice.listening ? 'Listening…' : 'Ask a constitutional question…'
+                  voice.listening ? t('assistant.listening') : t('assistant.placeholder')
                 }
                 disabled={streaming}
                 className="w-full bg-paper-soft dark:bg-ink-800 border border-slate/25 dark:border-ink-700 rounded-xl py-2.5 sm:py-3 pl-3 sm:pl-4 pr-12 sm:pr-14 text-ink-100 dark:text-paper outline-none focus:border-iris-500 transition-colors text-sm disabled:opacity-60"
@@ -567,7 +566,7 @@ export const Assistant: React.FC = () => {
           </div>
           {voice.listening && (
             <p className="text-[11px] text-rose-500 mt-2 px-1">
-              ● Listening — speak clearly. Tap the mic again to stop.
+              {t('assistant.listening_hint')}
             </p>
           )}
         </div>
