@@ -104,7 +104,7 @@ const ATTRIBUTION =
   'Oxford Constitutions of the World.';
 
 const HEADERS = {
-  'User-Agent': 'JuriSphere/1.0 (educational; contact via repo)',
+  'User-Agent': 'ConstIntell/1.0 (educational; contact via repo)',
   Accept: 'application/json',
 };
 

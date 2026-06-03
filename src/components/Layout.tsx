@@ -105,7 +105,7 @@ export const Layout: React.FC = () => {
                 <Scale className="w-5 h-5" />
               </div>
               <span className="font-serif font-bold text-xl tracking-wide text-world-deep-ocean dark:text-world-sand hidden sm:block">
-                Juri<span className="gradient-world">Sphere</span>
+                Const<span className="gradient-world">Intell</span>
               </span>
             </Link>
 
@@ -275,7 +275,7 @@ export const Layout: React.FC = () => {
                     <Scale className="w-4 h-4" />
                   </div>
                   <span className="font-serif font-bold text-lg">
-                    Juri<span className="gradient-world">Sphere</span>
+                    Const<span className="gradient-world">Intell</span>
                   </span>
                 </Link>
                 <button

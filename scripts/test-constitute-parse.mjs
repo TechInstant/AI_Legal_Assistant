@@ -7,7 +7,7 @@ const URL = `https://www.constituteproject.org/service/html?cons_id=${encodeURIC
 
 const res = await fetch(URL, {
   headers: {
-    'User-Agent': 'JuriSphere/1.0 (educational; contact via repo)',
+    'User-Agent': 'ConstIntell/1.0 (educational; contact via repo)',
     Accept: 'application/json',
   },
 });

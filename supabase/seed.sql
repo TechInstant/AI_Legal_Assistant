@@ -52,7 +52,7 @@ insert into public.articles (id, constitution_id, chapter, article_number, title
   ('us-amend5','us','Bill of Rights','Amendment V','Due Process and Self-Incrimination',
    'No person shall be held to answer for a capital, or otherwise infamous crime, unless on a presentment or indictment of a Grand Jury... nor shall be compelled in any criminal case to be a witness against himself, nor be deprived of life, liberty, or property, without due process of law; nor shall private property be taken for public use, without just compensation.', 8),
   ('us-amend14','us','Reconstruction Amendments','Amendment XIV, §1','Citizenship and Equal Protection',
-   'All persons born or naturalized in the United States, and subject to the jurisdiction thereof, are citizens of the United States and of the State wherein they reside. No State shall make or enforce any law which shall abridge the privileges or immunities of citizens of the United States; nor shall any State deprive any person of life, liberty, or property, without due process of law; nor deny to any person within its jurisdiction the equal protection of the laws.', 9),
+   'All persons born or naturalized in the United States, and subject to the Constsdiction thereof, are citizens of the United States and of the State wherein they reside. No State shall make or enforce any law which shall abridge the privileges or immunities of citizens of the United States; nor shall any State deprive any person of life, liberty, or property, without due process of law; nor deny to any person within its Constsdiction the equal protection of the laws.', 9),
 
   -- Nigeria
   ('ng-preamble','ng','Preamble','Preamble','Preamble',

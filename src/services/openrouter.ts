@@ -45,7 +45,7 @@ export const openRouterModel = (): string => model;
 // Two principles drive it: (1) the model answers ONLY from the provided
 // CONTEXT, never from training-data memory of constitutions; (2) every
 // non-trivial claim is cited with [Source N] so the user can verify.
-const SYSTEM_PROMPT = `You are JuriSphere, a constitutional research assistant.
+const SYSTEM_PROMPT = `You are ConstIntell, a constitutional research assistant.
 
 NON-NEGOTIABLE RULES:
 1. Answer the user's question based ONLY on the CONTEXT block in the user message. Do not use outside knowledge of any constitution, statute, case law, or legal commentary. If you find yourself wanting to cite something not in the CONTEXT, you must not.
@@ -104,8 +104,8 @@ async function postWithRetry(
   } else if (!PROXY_URL && apiKey) {
     headers.Authorization = `Bearer ${apiKey}`;
     headers['HTTP-Referer'] =
-      typeof window !== 'undefined' ? window.location.origin : 'https://JuriSphere.app';
-    headers['X-Title'] = 'JuriSphere';
+      typeof window !== 'undefined' ? window.location.origin : 'https://ConstIntell.app';
+    headers['X-Title'] = 'ConstIntell';
   }
 
   // Retry-once on 429 — handles brief upstream rate-limit blips on the
@@ -225,5 +225,6 @@ export const streamRAG = async (opts: RagOptions): Promise<void> => {
   }
   throw lastErr ?? new Error('OpenRouter: all fallback models exhausted');
 };
+
 
 

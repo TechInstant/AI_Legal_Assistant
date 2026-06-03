@@ -98,7 +98,7 @@ const resources = {
         signing_in: "Signing in…",
         new_here: "New here?",
         create_account: "Create an account",
-        join: "Join JuriSphere",
+        join: "Join ConstIntell",
         signup_subtitle: "Create an account to save research, get AI explanations, and follow constitutions worldwide.",
         full_name: "Full name",
         create: "Create account",
@@ -137,7 +137,7 @@ const resources = {
         secure_checkout: "Secure checkout powered by Stripe. Cancel anytime."
       },
       blog: {
-        title: "JuriSphere Blog",
+        title: "ConstIntell Blog",
         subtitle: "Insights on global constitutional law, updates, and legal analysis.",
         empty: "No blog posts found. Check back later!",
         read_more: "Read more →",
@@ -146,10 +146,10 @@ const resources = {
         published: "Published on {{date}}"
       },
       footer: {
-        disclaimer: "JuriSphere is an educational project designed for exploring constitutional texts. It is NOT a substitute for professional legal advice. Do not rely on AI-generated answers for legal compliance.",
+        disclaimer: "ConstIntell is an educational project designed for exploring constitutional texts. It is NOT a substitute for professional legal advice. Do not rely on AI-generated answers for legal compliance.",
         privacy: "Privacy Policy",
         terms: "Terms of Service",
-        copyright: "© {{year}} JuriSphere — Global Constitutional Intelligence.",
+        copyright: "© {{year}} ConstIntell — Global Constitutional Intelligence.",
         powered_by: "Powered by"
       },
       common: {
@@ -250,7 +250,7 @@ const resources = {
         signing_in: "Iniciando sesión…",
         new_here: "¿Eres nuevo?",
         create_account: "Crear una cuenta",
-        join: "Únete a JuriSphere",
+        join: "Únete a ConstIntell",
         signup_subtitle: "Crea una cuenta para guardar investigaciones, obtener explicaciones IA y seguir constituciones.",
         full_name: "Nombre completo",
         create: "Crear cuenta",
@@ -289,7 +289,7 @@ const resources = {
         secure_checkout: "Pago seguro con Stripe. Cancela cuando quieras."
       },
       blog: {
-        title: "Blog de JuriSphere",
+        title: "Blog de ConstIntell",
         subtitle: "Perspectivas sobre derecho constitucional global, actualizaciones y análisis legal.",
         empty: "No se encontraron publicaciones. ¡Vuelve más tarde!",
         read_more: "Leer más →",
@@ -298,10 +298,10 @@ const resources = {
         published: "Publicado el {{date}}"
       },
       footer: {
-        disclaimer: "JuriSphere es un proyecto educativo diseñado para explorar textos constitucionales. NO es un sustituto del asesoramiento legal profesional.",
+        disclaimer: "ConstIntell es un proyecto educativo diseñado para explorar textos constitucionales. NO es un sustituto del asesoramiento legal profesional.",
         privacy: "Política de Privacidad",
         terms: "Términos de Servicio",
-        copyright: "© {{year}} JuriSphere — Inteligencia Constitucional Global.",
+        copyright: "© {{year}} ConstIntell — Inteligencia Constitucional Global.",
         powered_by: "Desarrollado por"
       },
       common: {
@@ -324,7 +324,7 @@ const resources = {
         signed_in_as: "Connecté en tant que"
       },
       home: {
-        hero_tag: "Intelligence Juridique Mondiale",
+        hero_tag: "Intelligence Constdique Mondiale",
         hero_title: "Les Constitutions du Monde,",
         hero_title_highlight: "Citées et Comprises",
         hero_subtitle: "Parcourez, écoutez et posez des questions sur le droit constitutionnel de chaque continent. Chaque réponse cite une source exacte.",
@@ -350,7 +350,7 @@ const resources = {
       },
       explorer: {
         title: "Explorateur Constitutionnel",
-        subtitle: "Parcourez les textes juridiques suprêmes des nations du monde. Filtrez par continent ou allez directement à un pays.",
+        subtitle: "Parcourez les textes Constdiques suprêmes des nations du monde. Filtrez par continent ou allez directement à un pays.",
         search_any: "Recherchez et sélectionnez n'importe quel pays",
         search_in: "Rechercher des pays en {{region}}",
         indexed: "Indexé",
@@ -374,7 +374,7 @@ const resources = {
         stop: "Arrêter"
       },
       assistant: {
-        title: "Assistant Juridique IA",
+        title: "Assistant Constdique IA",
         subtitle: "Posez n'importe quelle question sur le droit constitutionnel — chaque réponse inclut des sources citées.",
         greeting: "Bonjour. Je suis votre Assistant d'Intelligence Constitutionnelle. Je ne citerai que le corpus constitutionnel indexé et citerai toujours mes sources. Tapez votre question — ou appuyez sur le microphone pour parler.",
         placeholder: "Posez une question constitutionnelle…",
@@ -394,7 +394,7 @@ const resources = {
       },
       auth: {
         welcome_back: "Bienvenue",
-        login_subtitle: "Connectez-vous pour marquer des articles, sauvegarder des notes et discuter avec l'IA juridique.",
+        login_subtitle: "Connectez-vous pour marquer des articles, sauvegarder des notes et discuter avec l'IA Constdique.",
         email: "E-mail",
         password: "Mot de passe",
         password_min: "(min. 6 caractères)",
@@ -402,7 +402,7 @@ const resources = {
         signing_in: "Connexion en cours…",
         new_here: "Nouveau ici ?",
         create_account: "Créer un compte",
-        join: "Rejoindre JuriSphere",
+        join: "Rejoindre ConstIntell",
         signup_subtitle: "Créez un compte pour sauvegarder vos recherches, obtenir des explications IA et suivre les constitutions.",
         full_name: "Nom complet",
         create: "Créer un compte",
@@ -420,7 +420,7 @@ const resources = {
       },
       pricing: {
         title: "Tarification simple et transparente",
-        subtitle: "Lisez les constitutions du monde gratuitement pour toujours. Passez à Pro pour une analyse juridique IA illimitée.",
+        subtitle: "Lisez les constitutions du monde gratuitement pour toujours. Passez à Pro pour une analyse Constdique IA illimitée.",
         basic: "Basique",
         basic_price: "0 $",
         forever: "/toujours",
@@ -433,7 +433,7 @@ const resources = {
         feature_bookmarks: "Marquer et sauvegarder des articles",
         feature_free_queries: "3 requêtes IA gratuites par jour",
         feature_everything: "Tout dans Basique, plus :",
-        feature_unlimited_ai: "Analyse juridique IA illimitée",
+        feature_unlimited_ai: "Analyse Constdique IA illimitée",
         feature_comparative: "Requêtes avancées de droit comparé",
         feature_export: "Exporter les notes de recherche en PDF",
         start_reading: "Commencer à Lire",
@@ -441,8 +441,8 @@ const resources = {
         secure_checkout: "Paiement sécurisé par Stripe. Annulez à tout moment."
       },
       blog: {
-        title: "Blog JuriSphere",
-        subtitle: "Perspectives sur le droit constitutionnel mondial, mises à jour et analyses juridiques.",
+        title: "Blog ConstIntell",
+        subtitle: "Perspectives sur le droit constitutionnel mondial, mises à jour et analyses Constdiques.",
         empty: "Aucun article trouvé. Revenez plus tard !",
         read_more: "Lire la suite →",
         back: "Retour au Blog",
@@ -450,10 +450,10 @@ const resources = {
         published: "Publié le {{date}}"
       },
       footer: {
-        disclaimer: "JuriSphere est un projet éducatif conçu pour explorer les textes constitutionnels. Ce n'est PAS un substitut à un conseil juridique professionnel.",
+        disclaimer: "ConstIntell est un projet éducatif conçu pour explorer les textes constitutionnels. Ce n'est PAS un substitut à un conseil Constdique professionnel.",
         privacy: "Politique de Confidentialité",
         terms: "Conditions d'Utilisation",
-        copyright: "© {{year}} JuriSphere — Intelligence Constitutionnelle Mondiale.",
+        copyright: "© {{year}} ConstIntell — Intelligence Constitutionnelle Mondiale.",
         powered_by: "Propulsé par"
       },
       common: {
@@ -475,4 +475,5 @@ i18n
   });
 
 export default i18n;
+
 
