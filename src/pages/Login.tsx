@@ -95,6 +95,9 @@ export const Login: React.FC = () => {
             {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <LogIn className="w-4 h-4" />}
             {busy ? 'Signing in…' : 'Sign in'}
           </Button>
+          <p className="text-[11px] text-center text-brand-slate dark:text-brand-mist/80 pt-2">
+            By signing in, you agree to our <Link to="/terms" className="underline hover:text-world-ocean">Terms of Service</Link> and <Link to="/privacy" className="underline hover:text-world-ocean">Privacy Policy</Link>.
+          </p>
         </form>
 
         <p className="text-sm text-center text-brand-slate dark:text-brand-mist">

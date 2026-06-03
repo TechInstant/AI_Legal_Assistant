@@ -361,7 +361,7 @@ export const Layout: React.FC = () => {
 
       {/* Footer */}
       <footer className="border-t border-slate/15 dark:border-ink-700 bg-paper/60 dark:bg-ink-950/70 backdrop-blur-sm py-6 md:py-8 transition-colors duration-300">
-        <div className="max-w-7xl mx-auto px-4 text-center text-xs md:text-sm text-slate dark:text-mist space-y-3">
+        <div className="max-w-7xl mx-auto px-4 text-center text-xs md:text-sm text-slate dark:text-mist space-y-4">
           <div className="flex justify-center gap-1">
             <span className="w-2 h-2 rounded-full bg-region-americas" />
             <span className="w-2 h-2 rounded-full bg-region-oceania" />
@@ -370,6 +370,16 @@ export const Layout: React.FC = () => {
             <span className="w-2 h-2 rounded-full bg-iris-500" />
             <span className="w-2 h-2 rounded-full bg-region-europe" />
           </div>
+          
+          <div className="flex justify-center gap-4 text-xs font-medium">
+            <Link to="/privacy" className="hover:text-iris-500 transition-colors">Privacy Policy</Link>
+            <Link to="/terms" className="hover:text-iris-500 transition-colors">Terms of Service</Link>
+          </div>
+
+          <p className="max-w-2xl mx-auto text-[10px] sm:text-xs opacity-80">
+            <strong>Disclaimer:</strong> LexIntell is an educational project designed for exploring constitutional texts. It is NOT a substitute for professional legal advice. Do not rely on AI-generated answers for legal compliance.
+          </p>
+
           <p>
             &copy; {new Date().getFullYear()} LexIntell — Global Constitutional
             Intelligence.
