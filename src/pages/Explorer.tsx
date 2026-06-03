@@ -20,6 +20,7 @@ import {
 import { BookmarkButton } from '../components/BookmarkButton';
 import { useTrackVisit } from '../lib/useBookmarks';
 import { useData } from '../context/DataContext';
+import { useTranslation } from 'react-i18next';
 
 const ListenButton: React.FC<{ text: string }> = ({ text }) => {
   const [playing, setPlaying] = useState(false);
@@ -150,6 +151,7 @@ export const Explorer: React.FC = () => {
   const [countryStatus, setCountryStatus] = useState<CountriesStatus>({
     state: 'idle',
   });
+  const { t } = useTranslation();
 
   // Loading is true while the global constitution list is still loading, or
   // while we're switching country pages and the article list is in flight.
@@ -207,12 +209,11 @@ export const Explorer: React.FC = () => {
           <div className="flex items-center gap-2 sm:gap-3 mb-2 sm:mb-3">
             <Globe className="w-6 h-6 sm:w-7 sm:h-7 text-iris-500" />
             <h1 className="m-0 text-2xl sm:text-3xl md:text-4xl">
-              Constitutional Explorer
+              {t('explorer.title')}
             </h1>
           </div>
           <p className="text-sm sm:text-base text-slate dark:text-mist mb-6 sm:mb-8 max-w-2xl">
-            Browse the supreme legal texts of nations around the world. Filter by
-            continent or jump straight to a country.
+            {t('explorer.subtitle')}
           </p>
         </div>
 
@@ -225,8 +226,8 @@ export const Explorer: React.FC = () => {
               onChange={(id) => navigate(`/explorer/${id}`)}
               placeholder={
                 continent === 'all'
-                  ? 'Search and select any country'
-                  : `Search countries in ${regionLabel[continent]}`
+                  ? t('explorer.search_any')
+                  : t('explorer.search_in', { region: regionLabel[continent] })
               }
             />
             <div className="text-xs sm:text-sm text-slate dark:text-mist text-left">
@@ -242,7 +243,7 @@ export const Explorer: React.FC = () => {
               the count above already tells users how much loaded. */}
           {countryStatus.state === 'error' && (
             <p className="text-[11px] text-rose-500">
-              ● Couldn't load the full country catalogue — showing what we have indexed.
+              ● {t('explorer.error_catalogue')}
             </p>
           )}
         </Card>
@@ -253,7 +254,7 @@ export const Explorer: React.FC = () => {
           </div>
         ) : filteredCountries.length === 0 ? (
           <p className="text-center text-slate dark:text-mist py-12">
-            No constitutions indexed for this continent yet.
+            {t('explorer.no_constitutions')}
           </p>
         ) : (
           <CountryGrid items={filteredCountries} />
@@ -269,7 +270,7 @@ export const Explorer: React.FC = () => {
         onClick={() => navigate('/explorer')}
         className="flex items-center gap-1 text-xs sm:text-sm text-slate dark:text-mist hover:text-iris-500 transition-colors mb-4 sm:mb-6"
       >
-        <ChevronLeft className="w-4 h-4" /> All constitutions
+        <ChevronLeft className="w-4 h-4" /> {t('explorer.all_constitutions')}
       </button>
 
       {activeConstitution && (

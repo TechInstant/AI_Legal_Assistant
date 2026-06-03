@@ -1,9 +1,4 @@
-// One-off parse smoke test — fetches one Constitute Project constitution
-// and prints what the seed script would write to Supabase. No DB writes.
-//
-// Usage:
-//   node scripts/test-constitute-parse.mjs              # default: Albania_2016
-//   node scripts/test-constitute-parse.mjs Brazil_2017  # any cons_id
+
 
 import { parse as parseHtml } from 'node-html-parser';
 
@@ -12,7 +7,7 @@ const URL = `https://www.constituteproject.org/service/html?cons_id=${encodeURIC
 
 const res = await fetch(URL, {
   headers: {
-    'User-Agent': 'LexIntell/1.0 (educational; contact via repo)',
+    'User-Agent': 'JuriSphere/1.0 (educational; contact via repo)',
     Accept: 'application/json',
   },
 });

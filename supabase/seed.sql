@@ -1,6 +1,3 @@
--- LexIntell — seed data
--- Run AFTER schema.sql in the Supabase SQL Editor.
--- Uses ON CONFLICT so it is safe to re-run.
 
 -- =========================================================================
 -- CONSTITUTIONS

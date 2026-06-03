@@ -19,6 +19,7 @@ import { CountryDropdown } from '../components/CountryDropdown';
 import { useAuth } from '../context/AuthContext';
 import { useBookmarks, useRecentlyViewed } from '../lib/useBookmarks';
 import { useData } from '../context/DataContext';
+import { useTranslation } from 'react-i18next';
 
 export const Home: React.FC = () => {
   const navigate = useNavigate();
@@ -29,6 +30,7 @@ export const Home: React.FC = () => {
   const [continent, setContinent] = useState<Region | 'all'>('all');
   const [countryId, setCountryId] = useState<string | null>(null);
   const [query, setQuery] = useState('');
+  const { t } = useTranslation();
 
   const fullName = (user?.user_metadata?.full_name as string | undefined) ?? '';
   const firstName = fullName.split(/\s+/)[0] || user?.email?.split('@')[0] || '';
@@ -93,30 +95,29 @@ export const Home: React.FC = () => {
         <div className="max-w-4xl mx-auto space-y-5 sm:space-y-7 md:space-y-8 relative">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-slate/30 dark:border-ink-700 text-[10px] sm:text-xs uppercase tracking-wider text-slate dark:text-mist bg-paper-soft/60 dark:bg-ink-800/60 backdrop-blur-sm">
             <Sparkles className="w-3.5 h-3.5 text-green-500" />
-            Global Legal Intelligence
+            {t('home.hero_tag')}
           </div>
 
           <h1 className="leading-tight text-3xl sm:text-4xl md:text-5xl">
-            The World&apos;s Constitutions,{' '}
+            {t('home.hero_title')}{' '}
             <br className="hidden sm:block" />
-            <span className="gradient-world">Cited &amp; Understood</span>
+            <span className="gradient-world">{t('home.hero_title_highlight')}</span>
           </h1>
 
           <p className="text-base sm:text-lg md:text-xl text-slate dark:text-mist max-w-2xl mx-auto font-light px-2">
-            Browse, listen to, and ask questions about constitutional law from
-            every continent. Every answer carries an exact source.
+            {t('home.hero_subtitle')}
           </p>
 
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3 pt-1 px-2">
             <Link to="/explorer" className="w-full sm:w-auto">
               <Button className="w-full sm:w-auto px-6 py-2.5 sm:px-7 sm:py-3">
-                Explore Constitutions
+                {t('home.explore_btn')}
                 <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5" />
               </Button>
             </Link>
             <Link to="/assistant" className="w-full sm:w-auto">
               <Button variant="secondary" className="w-full sm:w-auto px-6 py-2.5 sm:px-7 sm:py-3">
-                Ask AI Assistant
+                {t('home.ask_btn')}
               </Button>
             </Link>
           </div>
@@ -133,16 +134,16 @@ export const Home: React.FC = () => {
               </span>
               <div className="min-w-0 flex-1">
                 <p className="text-xs uppercase tracking-wider text-slate dark:text-mist mb-0.5">
-                  Welcome back
+                  {t('home.welcome_back')}
                 </p>
                 <h2 className="m-0 text-xl sm:text-2xl truncate">
-                  {firstName ? `Hello, ${firstName}` : 'Hello'}
+                  {firstName ? `${t('home.hello')}, ${firstName}` : t('home.hello')}
                 </h2>
               </div>
               <Link to="/bookmarks" className="shrink-0">
                 <Button variant="secondary" className="px-4 py-2">
                   <Bookmark className="w-4 h-4" />
-                  <span className="hidden sm:inline">Bookmarks</span>
+                  <span className="hidden sm:inline">{t('nav.bookmarks')}</span>
                   <span className="text-xs px-1.5 py-0.5 rounded-full bg-honey-500/15 text-honey-500 ml-1">
                     {bookmarks.length}
                   </span>
@@ -154,7 +155,7 @@ export const Home: React.FC = () => {
               <div className="mt-5 pt-5 border-t border-slate/10 dark:border-ink-700">
                 <div className="flex items-center gap-2 text-xs uppercase tracking-wider text-slate dark:text-mist mb-3">
                   <Clock className="w-3.5 h-3.5" />
-                  Continue reading
+                  {t('home.continue_reading')}
                 </div>
                 <div className="flex gap-2 overflow-x-auto -mx-1 px-1 pb-1">
                   {recentCountries.map((c) => (
@@ -181,7 +182,7 @@ export const Home: React.FC = () => {
         <Card className="max-w-4xl mx-auto p-4 sm:p-6 md:p-7 space-y-4 sm:space-y-5 bg-paper-soft/95 dark:bg-ink-800/80 backdrop-blur-md">
           <div className="flex items-center gap-2 text-[11px] sm:text-xs uppercase tracking-[0.18em] text-slate dark:text-mist">
             <Globe className="w-3.5 h-3.5 text-iris-500" />
-            Pick a continent, then a country
+            {t('home.pick_continent')}
           </div>
 
           <ContinentSelector value={continent} onChange={setContinent} />
@@ -193,8 +194,8 @@ export const Home: React.FC = () => {
               onChange={goToCountry}
               placeholder={
                 continent === 'all'
-                  ? 'Select any country'
-                  : `Select a country in ${regionLabel[continent]}`
+                  ? t('home.select_any')
+                  : t('home.select_in', { region: regionLabel[continent] })
               }
             />
             <Button
@@ -203,13 +204,13 @@ export const Home: React.FC = () => {
               className="sm:px-6 w-full sm:w-auto"
             >
               <BookOpen className="w-4 h-4" />
-              Read constitution
+              {t('home.read_constitution')}
             </Button>
           </div>
 
           {filteredCountries.length === 0 && (
             <p className="text-sm text-slate dark:text-mist">
-              No constitutions are indexed for this continent yet.
+              {t('explorer.no_constitutions')}
             </p>
           )}
         </Card>
@@ -224,11 +225,11 @@ export const Home: React.FC = () => {
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Ask: 'right to life in Nigeria'…"
+              placeholder={t('home.ask_placeholder')}
               className="flex-1 min-w-0 bg-transparent border-none outline-none text-sm md:text-base text-ink-100 dark:text-paper placeholder:text-slate dark:placeholder:text-mist py-2.5 sm:py-3"
             />
             <Button type="submit" className="py-2 px-4 sm:px-5 shrink-0">
-              Ask
+              {t('home.ask')}
             </Button>
           </Card>
         </form>
@@ -238,12 +239,12 @@ export const Home: React.FC = () => {
       {featured.length > 0 && (
         <section className="px-3 sm:px-4 py-10 sm:py-14 max-w-7xl mx-auto w-full">
           <div className="flex items-end justify-between mb-5 sm:mb-6">
-            <h2 className="m-0 text-2xl sm:text-3xl">Featured constitutions</h2>
+            <h2 className="m-0 text-2xl sm:text-3xl">{t('home.featured')}</h2>
             <Link
               to="/explorer"
               className="text-xs sm:text-sm text-iris-500 hover:underline flex items-center gap-1 shrink-0"
             >
-              View all <ArrowRight className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              {t('home.view_all')} <ArrowRight className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             </Link>
           </div>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
@@ -260,7 +261,7 @@ export const Home: React.FC = () => {
                   </div>
                   <h3 className="text-base sm:text-lg font-serif">{c.country}</h3>
                   <p className="text-xs text-slate dark:text-mist mb-2">
-                    Adopted {c.adopted}
+                    {t('explorer.adopted', { date: c.adopted })}
                   </p>
                   <p className="text-sm text-slate dark:text-mist line-clamp-2">
                     {c.summary}
@@ -279,9 +280,9 @@ export const Home: React.FC = () => {
             <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-iris-500/10 text-iris-500 flex items-center justify-center">
               <Globe className="w-5 h-5" />
             </div>
-            <h3 className="text-base sm:text-lg">Global Coverage</h3>
+            <h3 className="text-base sm:text-lg">{t('home.global_coverage')}</h3>
             <p className="text-sm text-slate dark:text-mist">
-              Foundational texts from every continent, fully indexed and searchable.
+              {t('home.global_coverage_desc')}
             </p>
           </Card>
 
@@ -289,10 +290,9 @@ export const Home: React.FC = () => {
             <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-sage-500/10 text-sage-500 flex items-center justify-center">
               <Shield className="w-5 h-5" />
             </div>
-            <h3 className="text-base sm:text-lg">Cited AI Answers</h3>
+            <h3 className="text-base sm:text-lg">{t('home.cited_ai')}</h3>
             <p className="text-sm text-slate dark:text-mist">
-              The assistant only quotes from indexed articles, with confidence and
-              voice readout.
+              {t('home.cited_ai_desc')}
             </p>
           </Card>
 
@@ -300,10 +300,9 @@ export const Home: React.FC = () => {
             <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-honey-500/10 text-honey-500 flex items-center justify-center">
               <Sparkles className="w-5 h-5" />
             </div>
-            <h3 className="text-base sm:text-lg text-honey-500">Voice First</h3>
+            <h3 className="text-base sm:text-lg text-honey-500">{t('home.voice_first')}</h3>
             <p className="text-sm text-slate dark:text-mist">
-              Listen to any article, ask by voice, hear the answer back —
-              accessible by design.
+              {t('home.voice_first_desc')}
             </p>
           </Card>
         </div>

@@ -18,7 +18,7 @@ export const Privacy: React.FC = () => {
         <section className="space-y-3">
           <h2 className="text-xl font-semibold">2. How We Use Your Information</h2>
           <p className="text-slate dark:text-mist">
-            Your information is used solely to provide the services of LexIntell (bookmarking articles, saving your recent views). We do not sell or share your personal information with third parties.
+            Your information is used solely to provide the services of JuriSphere (bookmarking articles, saving your recent views). We do not sell or share your personal information with third parties.
           </p>
         </section>
 
@@ -32,10 +32,11 @@ export const Privacy: React.FC = () => {
         <section className="space-y-3">
           <h2 className="text-xl font-semibold">4. Contact Us</h2>
           <p className="text-slate dark:text-mist">
-            If you have any questions about this Privacy Policy, please contact us at privacy@lexintell.com.
+            If you have any questions about this Privacy Policy, please contact us at privacy@JuriSphere.com.
           </p>
         </section>
       </Card>
     </div>
   );
 };
+

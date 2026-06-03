@@ -1,7 +1,3 @@
--- LexIntell — Supabase schema
--- Run this once in the Supabase SQL Editor. It is idempotent: re-running
--- will not duplicate tables or policies.
-
 -- =========================================================================
 -- 1) TABLES
 -- =========================================================================
