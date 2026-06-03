@@ -3,7 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { Card } from '../components/Card';
 import { supabase } from '../lib/supabase';
 import { Loader2, ChevronLeft } from 'lucide-react';
-import { BlogPost } from './BlogList';
+import { type BlogPost } from './BlogList';
 import { useTranslation } from 'react-i18next';
 
 export const BlogPostPage: React.FC = () => {
